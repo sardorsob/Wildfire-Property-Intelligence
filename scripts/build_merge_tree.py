@@ -35,18 +35,20 @@ MERGE_LIST = [
 def make_leaf(name):
     return {"name": name, "value": 0}
 
-def get_leaves(node, out=None):
-    if out is None:
-        out = []
+
+def get_leaves(node, leaves=None):
+    if leaves is None:
+        leaves = []
     if "children" not in node:
-        out.append(node.get("name", ""))
+        leaves.append(node.get("name", ""))
     else:
-        for c in node["children"]:
-            get_leaves(c, out)
-    return out
+        for child in node["children"]:
+            get_leaves(child, leaves)
+    return leaves
+
 
 def build_tree():
-    # cluster_root[color] = the root node of that color's cluster
+    # Root node for each color's current cluster.
     roots = {}
 
     for merged, canonical, votes in MERGE_LIST:
@@ -55,42 +57,58 @@ def build_tree():
         if canonical not in roots:
             roots[canonical] = {"name": canonical}
 
-        ra = roots[merged]
-        rb = roots[canonical]
-        if ra is rb:
+        merged_root = roots[merged]
+        canonical_root = roots[canonical]
+        if merged_root is canonical_root:
             continue
 
         new_node = {
             "name": canonical,
             "value": round(votes, 1),
-            "children": [ra, rb]
+            "children": [merged_root, canonical_root],
         }
-        for c in get_leaves(ra) + get_leaves(rb):
-            roots[c] = new_node
+        for color in get_leaves(merged_root) + get_leaves(canonical_root):
+            roots[color] = new_node
 
-    # Unique top roots
+    # Find the unique cluster roots in the D3 display order.
     group_order = ["red", "navy", "cocoa", "olive", "alabaster", "amber", "orange"]
     seen = set()
-    top_by_canon = {}
+    top_by_canonical = {}
     for color, node in roots.items():
         if id(node) in seen:
             continue
         seen.add(id(node))
         leaves = get_leaves(node)
-        canon = max(leaves, key=lambda x: (x in group_order, group_order.index(x) if x in group_order else 99, x))
-        top_by_canon[canon] = node
-        node["name"] = canon.upper()
+        canonical = max(
+            leaves,
+            key=lambda name: (
+                name in group_order,
+                group_order.index(name) if name in group_order else 99,
+                name,
+            ),
+        )
+        top_by_canonical[canonical] = node
+        node["name"] = canonical.upper()
 
-    top_list = [top_by_canon[c] for c in group_order if c in top_by_canon]
+    top_list = [top_by_canonical[color] for color in group_order if color in top_by_canonical]
     return {"name": "root", "children": top_list}
+
 
 def main():
     tree = build_tree()
-    out_path = Path(__file__).parent.parent / "website" / "frontend" / "public" / "data" / "color-pool-merge-tree.json"
+    out_path = (
+        Path(__file__).parent.parent
+        / "website"
+        / "frontend"
+        / "public"
+        / "data"
+        / "color-pool-merge-tree.json"
+    )
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w") as f:
         json.dump(tree, f, indent=2)
     print(f"Wrote {out_path}")
+
 
 if __name__ == "__main__":
     main()
