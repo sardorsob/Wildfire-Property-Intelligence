@@ -48,7 +48,7 @@ together, not chained as one model:
 | Notebook | Intended handoff | Re-execution note |
 | --- | --- | --- |
 | `methods/bayesian_shrinkage_pooling/bayesian_shrinkage_pooling.ipynb` | `results/tables/bayesian_shrinkage/` | Currently expects an uncompressed inventory and has a relative output-path mismatch. |
-| `methods/bayesian_shrinkage_pooling/conditional_probability.ipynb` | `results/tables/conditional_probability/` | Neighbor-pooled summary and detail tables support later synthesis. |
+| `methods/bayesian_shrinkage_pooling/conditional_probability.ipynb` | `results/tables/conditional_probability/` | Requires an uncompressed inventory and a normalized `website/backend/data` neighbor path; checked-in data is `website/_archive/backend/data`. |
 | `methods/group_level_distribution_analysis/group_level_anomaly_detection.ipynb` | `results/tables/grouplevel_divergence/` | Current exports are written to the working directory. |
 | `methods/c2st/classifier_two_sample.ipynb` | C2ST result exports | Currently expects an uncompressed inventory and needs a normalized destination. |
 | `methods/spatial_autocorrelation/morans_i.sql` | `results/tables/morans_i/` | Run only when its SQL/data preparation is available. |

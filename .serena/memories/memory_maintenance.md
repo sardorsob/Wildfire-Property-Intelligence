@@ -12,8 +12,7 @@
   Folders can mirror project structure (e.g. modules like frontend/backend) or topics like debugging, architecture, etc.
 - Memory references must use a mem: prefix inside backticks, e.g. `mem:frontend/core`.
   The surrounding text should clearly indicate when to read the memory/which content to expect.
-  The text should provide more precise guidance than the memory name alone,
-  i.e. avoid a reference like "frontend debugging: `mem:frontend/debugging` and instead make clear which aspects of frontend debugging are covered.
+  Use precise guidance: `mem:frontend/debugging` should name the debugging it covers.
 - Memories themselves should not contain information about when to read them; this is the responsibility of the referring memory.
 
 ## Style
