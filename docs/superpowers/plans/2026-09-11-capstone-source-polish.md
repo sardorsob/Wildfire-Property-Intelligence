@@ -48,8 +48,9 @@ Delete the byte-identical unreferenced `07` script.
 
 - [ ] **Step 3: Verify behavior contracts**
 
-Run the same AST and merge-tree checks. Confirm `rg` finds no tracked reference
-to the deleted filename. Do not run the merge-tree writer.
+Run the same AST and merge-tree checks. Confirm there is no active source or
+workflow reference to the deleted filename outside `docs/superpowers`. Do not
+run the merge-tree writer.
 
 - [ ] **Step 4: Commit**
 

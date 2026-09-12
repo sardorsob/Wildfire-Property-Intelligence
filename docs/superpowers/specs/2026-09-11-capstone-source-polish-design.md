@@ -55,8 +55,9 @@ Keep `scripts/build_merge_tree.py` intentionally small and preserve its merge
 order and JSON contract. Treat
 `notebooks/eda/06_mode_homogeneity_relative_freq.py` as the canonical legacy
 CLI. Remove the byte-for-byte duplicate
-`notebooks/eda/07_data_measurement_generation.py`; no tracked file references
-it, and the archive branch preserves it.
+`notebooks/eda/07_data_measurement_generation.py`; outside
+`docs/superpowers`, it has no active source or workflow references, and the
+archive branch preserves it.
 
 ## Verification and commits
 
