@@ -1,165 +1,84 @@
 # Wildfire Property Intelligence
 
-Exploratory analysis and comparative evaluation of statistical, spatial, and machine learning methods for identifying reporting inconsistencies in aggregated NSI property data for wildfire risk applications.
+Exploratory analysis and comparative evaluation of statistical, spatial, and
+machine-learning signals for possible reporting inconsistencies in aggregated
+California NSI property data used in wildfire-risk applications.
 
-## Problem Description
+## Problem
 
-Wildfires are a major source of property loss in California, and inaccurate large-scale property inventories can distort the risk models used by insurers, planners, and policymakers. This project studies how to detect inconsistent or erroneous county-level property characteristics in aggregated NSI data, with a focus on distinguishing true structural variation from sparsity, heterogeneity, and reporting differences.
+Wildfires are a major source of property loss in California. Inaccurate
+large-scale property inventories can distort risk models used by insurers,
+planners, and policymakers. This project separates potential reporting
+inconsistency from structural variation, sparsity, heterogeneity, and local
+context.
 
-## Environment Setup
+## Environment
 
-Recommended local environment:
-
-- Python 3.10+ for notebooks and analysis
+- Python 3.10+ and Jupyter for the analysis notebooks
 - Node.js 18+ for the website frontend
-- Jupyter for notebook execution
-- optional: `uv` for the archived website backend in `website/_archive/backend`
+- `uv` is optional for the archived website backend in
+  `website/_archive/backend`
 
-Create and activate a virtual environment:
+Create a Python environment and install the notebook dependencies:
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate      # macOS / Linux
 .venv\Scripts\activate         # Windows
-```
-
-## Dependencies
-
-### Python
-
-Install notebook and analysis dependencies from `requirements.txt`:
-
-```bash
 pip install -r requirements.txt
 ```
 
-Key packages and versions:
+Website dependencies are declared in `website/frontend/package.json`; the
+archived export backend has its own `website/_archive/backend/pyproject.toml`.
 
-- `pandas >= 2.0`
-- `numpy >= 2.0`
-- `scipy >= 1.14`
-- `matplotlib >= 3.10`
-- `geopandas >= 1.0`
-- `h3 >= 3.7`
-- `shapely >= 2.0`
-- `jupyter >= 1.0`
-- `ipykernel >= 7.2`
+## Data
 
-### Website
-
-Website dependencies are defined in `website/frontend/package.json`.
-The archived website export/backend dependencies are defined in `website/_archive/backend/pyproject.toml`.
-
-## Dataset Access
-
-The primary dataset is available in the repo `dataset/` directory:
+The checked-in primary inputs are:
 
 - `dataset/Capstone2025_nsi_lvl9_with_landcover_and_color.csv.gz`
 - `dataset/ca_county_neighbors.csv`
 - `dataset/ca-county-neighbors.json`
 
-`ca_county_neighbors.csv` is used for neighbor-pooling and spatial methods.
+The neighbor CSV supports neighbor pooling and spatial comparisons.
 
-## Commands to Run Experiments
+## Analysis workflow
 
-### Run all notebooks (EDA and Methods)
+The notebook collection is a staged research record, not a one-command
+pipeline. Run a notebook only from a working directory supported by its own
+path setup, and inspect its required tables first. Several notebooks need path
+or output normalization before they can be rerun as connected stages.
 
-From the project root, open and execute notebooks in order. Paths in notebooks assume execution from the project root or `notebooks/`:
+[`notebooks/README.md`](notebooks/README.md) is the detailed entry point. The
+intended progression is:
 
-```text
-notebooks/eda/01_dataset_anatomy.ipynb
-notebooks/eda/02_exposure_density_sparsity.ipynb
-notebooks/eda/03_color.ipynb
-notebooks/eda/04_conditional_distributions.ipynb
-notebooks/eda/05_spatial_coherence.ipynb
-notebooks/eda/06_mode_homogeneity_relative_freq.ipynb
-notebooks/eda/in_depth_analysis.ipynb
-```
+1. Inventory and foundational EDA: dataset anatomy, exposure and sparsity, and
+   color vocabulary establish the context for later diagnostics.
+2. Supplementary checks: conditional-distribution, older spatial/mode, and
+   chi-square work provide exploratory context but are not prerequisites.
+3. Independent methods: empirical Bayes, neighbor-pooled conditional
+   probability, group-level divergence, C2ST, and Moran/relative-frequency
+   work offer complementary signals rather than a single score.
+4. Grouping sensitivity: color-pooling and hierarchical alternatives test how
+   grouping choices affect the diagnostics; they do not verify an error.
+5. Synthesis and case study: maps and in-depth analysis consume available
+   stage evidence; the San Diego case study is the final consumer.
 
-### Methods notebooks
+## Checked-in evidence
 
-```text
-notebooks/methods/bayesian_shrinkage_pooling/bayesian_shrinkage_pooling.ipynb
-notebooks/methods/bayesian_shrinkage_pooling/conditional_probability.ipynb
-notebooks/methods/color_groupings/color_pool.ipynb
-notebooks/methods/color_groupings/hierarchical_clustering.ipynb
-notebooks/methods/chi_test/chi_square_residuals.ipynb
-notebooks/methods/c2st/classifier_two_sample.ipynb
-notebooks/methods/group_level_distribution_analysis/group_level_anomaly_detection.ipynb
-```
+`results/tables/` contains the checked-in tables used by the capstone, and
+`figures/eda/` plus `figures/method_comparison/` contain its saved figures.
+They are preserved evidence, not outputs regenerated by these instructions.
+The synthesis notebooks and static website also use selected precomputed files
+under `website/_archive/backend/data/` and
+`website/frontend/public/data/`.
 
-To execute a notebook from the command line:
+See [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) for the factual repository
+layout and [website/README.md](website/README.md) for the separate static-site
+lane.
 
-```bash
-jupyter nbconvert --to notebook --execute notebooks/eda/in_depth_analysis.ipynb
-```
+## Future work
 
-### Website
-
-Development:
-
-```bash
-cd website/frontend
-npm install
-npm run dev
-```
-
-Production checks:
-
-```bash
-cd website/frontend
-npm run build
-npm run preview
-```
-
-## Expected Outputs
-
-**Tables** (written to `results/tables/`):
-- `02_exposure_density_sparsity/` — `eda_exposure_per_h3.csv`, `eda_exposure_by_county.csv`, `eda_exposure_by_landcover.csv`, `eda_exposure_diversity.csv`, `eda_sparsity_regimes.csv`
-- `03_color/` — `color_similarity_matrix.csv`, `landcover_color_combinations.csv`
-- `bayesian_shrinkage/` — `bayesian_shrinkage_aggregated_counts.csv`, `bayesian_shrinkage_baseline_distributions.csv`, `bayesian_shrinkage_stabilized_distributions.csv`
-- `conditional_probability/` — `m01_neighbor_pool_county_lc_summary.csv`, `m01_neighbor_pool_county_lc_color_detail.csv`
-- `morans_i/` — `relative_frequencies_lc_type_bldgtype.csv`
-- `grouplevel_divergence/` — `jsd_conditional_divergence.csv`, `jsd_conditional_county_summary.csv`, `color_pairs_analysis.csv`
-- `hierarchical_clustering/` — `hierarchical__color_groups__*.csv`, `hierarchical__color_groups_best_jsd__*.csv`, `hierarchical__color_groups_best_surprisal__*.csv`, `hierarchical__jsd_by_k__*.csv`
-- `leiden_clustering/` — `leiden__color_groups__*.csv`, `leiden__comparison__*.csv`
-- `clustering/` — `clustering__all_methods__*.csv`
-- `color_pool_improved/` — `color_pool_improved__variants__*.csv`
-
-**Figures** (written to `figures/`):
-- `figures/eda/` — exposure distribution, landcover heatmaps, county maps
-- `figures/in_depth_analysis/` — `eda_county_reliability_map.png`, `county_mean_neighbor_jsd_map.png`, `county_mean_surprisal_map.png`, exposure vs diversity, divergence vs exposure, etc.
-- `figures/method_comparison/` — pooling comparisons, dendrograms, JSD vs K
-
-**In-depth analysis** produces `results.md` with a summarized narrative of findings.
-
----
-
-## Directory Structure
-
-```text
-Wildfire-Property-Intelligence/
-├── dataset/                    # Main source data and county-neighbor files
-├── notebooks/
-│   ├── eda/                    # Exploratory analysis notebooks
-│   └── methods/                # Method notebooks by approach
-├── results/
-│   └── tables/                 # CSV outputs by analysis stage
-├── figures/                    # Generated figures and plots
-├── report/                     # Paper/report source files
-├── scripts/                    # Helper scripts
-├── website/
-│   ├── frontend/               # React + Vite website
-│   └── _archive/backend/       # Archived website export/backend code
-├── requirements.txt
-├── results.md
-└── README.md
-```
-
-## Future Work
-
-- Extend the analysis beyond California to a broader geographic scope
-- Refine the greedy color-pooling procedure, since early merges are irreversible and may block better later groupings
-- Study hyperparameter sensitivity more formally instead of relying on manual inspection
-- Test grouping strategies separately within structural contexts such as damage category, building type, and land cover
-- Incorporate evidence from non-neighboring counties that share similar structural patterns, not just adjacent counties
+- Extend the analysis beyond California.
+- Study grouping and hyperparameter sensitivity more formally.
+- Compare structurally similar non-neighboring counties as well as adjacent
+  counties.

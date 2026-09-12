@@ -1,38 +1,35 @@
 # Project Structure
 
-## Root Directories
+```text
+Wildfire-Property-Intelligence/
+├── dataset/                         # NSI inventory and county-neighbor inputs
+├── notebooks/
+│   ├── README.md                     # Workflow, handoffs, and caveats
+│   ├── eda/                          # Foundational, exploratory, and synthesis notebooks
+│   └── methods/
+│       ├── bayesian_shrinkage_pooling/
+│       ├── c2st/
+│       ├── chi_test/
+│       ├── color_groupings/
+│       ├── group_level_distribution_analysis/
+│       └── spatial_autocorrelation/
+├── results/
+│   └── tables/                       # Checked-in analysis tables
+├── figures/
+│   ├── eda/                          # Saved EDA and synthesis figures
+│   └── method_comparison/            # Saved comparison figures
+├── report/                           # Capstone paper, poster, and LaTex source
+├── scripts/
+│   └── build_merge_tree.py           # Builds website color-grouping data
+├── website/
+│   ├── frontend/                     # Static React + Vite app
+│   └── _archive/backend/             # Archived export backend and source copies
+├── requirements.txt
+├── README.md
+└── PROJECT_STRUCTURE.md
+```
 
-**`dataset/`** - Contains the main NSI property dataset with landcover and color information (CSV files).
-
-**`notebooks/`** - Jupyter notebooks for analysis and method implementation.
-
-**`figures/`** - Generated visualization outputs (plots, charts, maps).
-
-**`results/`** - Analysis outputs including tables, scores, and evaluation metrics.
-
-**`src/`** - Source code modules and utility functions.
-
-## Subdirectories
-
-**`notebooks/eda/`** - Exploratory data analysis notebooks (dataset anatomy, exposure density, marginal distributions).
-
-**`notebooks/methods/color_groupings/`** - Color pooling methods: color_pool (vote-based), optimization (divergence), hierarchical_clustering (Ward/complete linkage).
-
-**`notebooks/frameworks/`** - Method implementation and comparison notebooks.
-
-**`figures/eda/`** - EDA visualization outputs (distribution plots, exposure analysis).
-
-**`figures/method_comparisons/`** - Comparison plots for different detection methods.
-
-**`results/tables/`** - CSV tables with computed statistics and summaries.
-
-**`results/scores/`** - Evaluation scores and metrics for method comparisons.
-
-## Key Files
-
-**`README.md`** - Project overview and documentation.
-
-**`.gitignore`** - Git ignore rules (excludes CSV files and common temp files).
-
-
-
+The repository does not currently provide a normalized serial notebook runner.
+Read [notebooks/README.md](notebooks/README.md) before re-executing analysis
+notebooks, and [website/README.md](website/README.md) for the separate static
+site workflow.

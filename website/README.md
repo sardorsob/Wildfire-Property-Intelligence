@@ -14,6 +14,9 @@ website/
 
 The frontend is a fully static app. Precomputed data is shipped in `frontend/public/data/`.
 
+Regenerating that app data is a separate website export lane, not a prerequisite
+for the analysis notebooks.
+
 ## Quick Start
 
 ```bash
