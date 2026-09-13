@@ -6,13 +6,8 @@ import { cn } from './lib/utils'
 import { chartColors } from './lib/chart-colors'
 import { DASHBOARD_MAP_STYLE } from './lib/dashboardMap'
 import { PROPERTY_COLORS } from './lib/propertyColors'
+import { buildCountyDetail, type ColorDistribution, type CountyDetail, type DetailRow, type SummaryRow } from './lib/conditionalPooling'
 
-interface SummaryRow { fips: number; lc_type: string; n_county: number; n_pool: number; num_neighbors: number; kl_div: number; l1_distance: number; top_color: string; top_contrib: number }
-interface DetailRow { fips: number; lc_type: string; clr: string; y_county: number; y_pool: number; p_county: number; p_pool: number; contrib: number; abs_diff: number }
-
-interface ColorDistribution { clr: string; y_county: number; y_pool: number; p_county: number; p_pool: number; contrib: number; abs_diff: number }
-interface LandcoverDetail { lc_type: string; n_county: number; n_pool: number; num_neighbors: number; kl_div: number; l1_distance: number; top_color: string; top_contrib: number; distributions: ColorDistribution[] }
-interface CountyDetail { fips: string; county_name: string; by_landcover: LandcoverDetail[]; total_landcover_types: number }
 interface CountyMapData { type: 'FeatureCollection'; features: GeoJSON.Feature[]; metric: string; lc_type: string | null; stats: { total_counties: number; mean_value: number; max_value: number } }
 
 function buildMapData(summaryRows: SummaryRow[], geoFeatures: GeoJSON.Feature[], lc: string, metric: string): CountyMapData {
@@ -68,31 +63,6 @@ function buildMapData(summaryRows: SummaryRow[], geoFeatures: GeoJSON.Feature[],
             max_value: allValues.length > 0 ? Math.max(...allValues) : 0,
         }
     }
-}
-
-function buildCountyDetail(fipsNum: number, summaryRows: SummaryRow[], detailRows: DetailRow[], geoFeatures: GeoJSON.Feature[], lc: string): CountyDetail {
-    const fipsStr = String(fipsNum).padStart(5, '0')
-    const geo = geoFeatures.find(f => f.properties?.fips === fipsStr)
-    const county_name = geo?.properties?.county_name || geo?.properties?.name || fipsStr
-
-    const filteredSummary = summaryRows.filter(r => r.fips === fipsNum && (!lc || r.lc_type === lc))
-    const filteredDetail = detailRows.filter(r => r.fips === fipsNum && (!lc || r.lc_type === lc))
-
-    const by_landcover: LandcoverDetail[] = filteredSummary.map(s => ({
-        lc_type: s.lc_type,
-        n_county: s.n_county,
-        n_pool: s.n_pool,
-        num_neighbors: s.num_neighbors,
-        kl_div: s.kl_div,
-        l1_distance: s.l1_distance,
-        top_color: s.top_color,
-        top_contrib: s.top_contrib,
-        distributions: filteredDetail
-            .filter(d => d.lc_type === s.lc_type)
-            .map(d => ({ clr: d.clr, y_county: d.y_county, y_pool: d.y_pool, p_county: d.p_county, p_pool: d.p_pool, contrib: d.contrib, abs_diff: d.abs_diff }))
-    }))
-
-    return { fips: fipsStr, county_name, by_landcover, total_landcover_types: by_landcover.length }
 }
 
 export function ConditionalProbability() {

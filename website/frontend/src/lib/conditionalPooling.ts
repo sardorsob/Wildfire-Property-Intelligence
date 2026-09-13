@@ -1,5 +1,3 @@
-/** Shared types and buildCountyDetail for Conditional Probability / KL divergence */
-
 export interface SummaryRow {
     fips: number
     lc_type: string
@@ -92,7 +90,6 @@ export function buildCountyDetail(
     return { fips: fipsStr, county_name, by_landcover, total_landcover_types: by_landcover.length }
 }
 
-/** Build county detail aggregated across ALL land cover types (colors only). */
 export function buildCountyDetailAllLandcover(
     fipsNum: number,
     detailRows: DetailRow[],
@@ -106,6 +103,7 @@ export function buildCountyDetailAllLandcover(
     const totalCounty = filtered.reduce((s, d) => s + d.y_county, 0)
     const totalPool = filtered.reduce((s, d) => s + d.y_pool, 0)
 
+    // Aggregate repeated colors across land covers before normalizing.
     const byColor: Record<string, { y_county: number; y_pool: number }> = {}
     filtered.forEach((d) => {
         if (!byColor[d.clr]) byColor[d.clr] = { y_county: 0, y_pool: 0 }
