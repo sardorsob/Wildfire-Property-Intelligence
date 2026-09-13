@@ -1,7 +1,4 @@
 import type maplibregl from 'maplibre-gl'
-import { DASHBOARD_MAP_STYLE } from '../lib/dashboardMap'
-
-export { DASHBOARD_MAP_STYLE }
 
 /** Map defaults */
 export const MAP_CENTER: [number, number] = [-119.5, 37.0]

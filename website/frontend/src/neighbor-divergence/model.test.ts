@@ -2,7 +2,6 @@ const assert = await import('node:' + 'assert/strict')
 const { default: test } = await import('node:' + 'test')
 import {
     deriveComparisonSummary,
-    formatColorLabel,
     poolDistributions,
     type ComparisonResult,
     type FeatureDist,
@@ -122,12 +121,4 @@ test('deriveComparisonSummary preserves the empty result for missing and error c
 
     assert.deepEqual(deriveComparisonSummary(null, false), empty)
     assert.deepEqual(deriveComparisonSummary({ error: 'No comparison data' } as ComparisonResult, true), empty)
-})
-
-test('formatColorLabel preserves current group and placeholder labels', () => {
-    assert.equal(formatColorLabel('red'), 'red')
-    assert.equal(formatColorLabel('alabaster'), 'alabaster')
-    assert.equal(formatColorLabel('foo'), 'foo')
-    assert.equal(formatColorLabel('bar'), 'bar')
-    assert.equal(formatColorLabel('blue_green'), 'blue_green')
 })

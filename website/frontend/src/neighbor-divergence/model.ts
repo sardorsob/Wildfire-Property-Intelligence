@@ -10,10 +10,6 @@ export const COLOR_GROUPS_MAP: Record<string, string> = {
 
 export const COLOR_GROUP_NAMES = new Set(Object.values(COLOR_GROUPS_MAP))
 
-export function formatColorLabel(value: string): string {
-    return COLOR_GROUP_NAMES.has(value) ? value.replace('_', ' / ') : value
-}
-
 export interface DivergenceData {
     counties: GeoJSON.FeatureCollection
     edges: GeoJSON.FeatureCollection
@@ -38,7 +34,6 @@ export interface FeatureDist {
     count: number
     proportion: number
     unique: boolean
-    is_group?: boolean
 }
 
 export interface FeatureData {

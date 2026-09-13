@@ -1,7 +1,6 @@
 import type { RefObject } from 'react'
 import { cn } from '../lib/utils'
 import {
-    formatColorLabel,
     type ComparisonResult,
     type ComparisonSummary,
     type FeatureDist,
@@ -120,8 +119,8 @@ export function ComparisonPanel({
                                                         <span className="w-3 h-3 sm:w-4 sm:h-4 rounded-full border border-border shrink-0" style={{ backgroundColor: propertyColors[d.value] || '#ccc' }} />
                                                     )}
                                                     {colorGroupNames.has(d.value)
-                                                        ? <span className="px-1 py-0.5 rounded text-[10px] sm:text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-200">{formatColorLabel(d.value)}</span>
-                                                        : <span className="text-xs sm:text-sm truncate">{formatColorLabel(d.value)}</span>
+                                                        ? <span className="px-1 py-0.5 rounded text-[10px] sm:text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-200">{d.value}</span>
+                                                        : <span className="text-xs sm:text-sm truncate">{d.value}</span>
                                                     }
                                                 </span>
                                                 <div className="flex-1 h-2.5 sm:h-3 bg-muted rounded overflow-hidden">
@@ -156,8 +155,8 @@ export function ComparisonPanel({
                                                         <span className="w-3 h-3 sm:w-4 sm:h-4 rounded-full border border-border shrink-0" style={{ backgroundColor: propertyColors[d.value] || '#ccc' }} />
                                                     )}
                                                     {colorGroupNames.has(d.value)
-                                                        ? <span className="px-1 py-0.5 rounded text-[10px] sm:text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-200">{formatColorLabel(d.value)}</span>
-                                                        : <span className="text-xs sm:text-sm truncate">{formatColorLabel(d.value)}</span>
+                                                        ? <span className="px-1 py-0.5 rounded text-[10px] sm:text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-200">{d.value}</span>
+                                                        : <span className="text-xs sm:text-sm truncate">{d.value}</span>
                                                     }
                                                 </span>
                                                 <div className="flex-1 h-2.5 sm:h-3 bg-muted rounded overflow-hidden">

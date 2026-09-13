@@ -23,7 +23,6 @@ interface C2STRow {
 
 interface C2STData {
     edges: GeoJSON.FeatureCollection
-    lc_types: string[]
     stats: {
         total_pairs: number
         mean_accuracy: number
@@ -171,7 +170,7 @@ export function C2STMap() {
     const data = useMemo<C2STData | null>(() => {
         if (!sourceData) return null
         const { edges, stats } = buildEdgesGeoJSON(sourceData.rows, selectedLc)
-        return { edges, lc_types: sourceData.lc_types, stats }
+        return { edges, stats }
     }, [selectedLc, sourceData])
 
     const pairComparison = useMemo<PairComparison | null>(() => {
