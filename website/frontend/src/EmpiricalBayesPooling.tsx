@@ -62,6 +62,7 @@ function buildCountyDetail(fipsNum: number, stabilized: StabilizedDistribution[]
 export function EmpiricalBayesPooling() {
     const mapContainer = useRef<HTMLDivElement>(null)
     const map = useRef<maplibregl.Map | null>(null)
+    const mapLayerSubscriptions = useRef<maplibregl.Subscription[]>([])
     const selectedLandcoverRef = useRef<string>('')
     const sourceDataRef = useRef<EmpiricalBayesSourceData | null>(null)
 
@@ -152,6 +153,8 @@ export function EmpiricalBayesPooling() {
         if (!map.current) return
         try {
             if (!map.current.isStyleLoaded()) { map.current.once('styledata', () => applyMapLayer(data)); return }
+            for (const subscription of mapLayerSubscriptions.current) subscription.unsubscribe()
+            mapLayerSubscriptions.current = []
             if (map.current.getLayer('counties')) map.current.removeLayer('counties')
             if (map.current.getLayer('counties-outline')) map.current.removeLayer('counties-outline')
             if (map.current.getSource('counties')) map.current.removeSource('counties')
@@ -168,16 +171,18 @@ export function EmpiricalBayesPooling() {
             }
             map.current.addLayer({ id: 'counties-outline', type: 'line', source: 'counties', paint: { 'line-color': '#888', 'line-width': 1 } })
             const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false })
-            map.current.on('mousemove', 'counties', (e: maplibregl.MapLayerMouseEvent) => {
-                if (!e.features || e.features.length === 0) return
-                if (map.current) map.current.getCanvas().style.cursor = 'pointer'
-                const props = e.features[0].properties as unknown as CountyMapProperties
-                let html = `<div style="font-size:12px;line-height:1.5"><div style="font-weight:bold;margin-bottom:6px">${props.county_name || 'Unknown'} County</div><div>Exposure: <strong>${props.total_exposure?.toLocaleString()}</strong></div><div>Mean Abs Movement: <strong>${props.mean_value?.toFixed(4)}</strong></div><div>Max Abs Movement: ${props.max_value?.toFixed(4)}</div><div>Mean Shrinkage: ${props.mean_shrinkage_weight?.toFixed(3)}</div>`
-                if (props.top_color) html += `<div style="margin-top:6px;padding-top:6px;border-top:1px solid #eee"><div style="font-size:11px;color:#666">Top Color Change:</div><div style="color:#d97706;font-weight:500">${props.top_color}</div></div>`
-                html += `<div style="margin-top:6px;font-size:10px;color:#666">Click for details</div></div>`
-                popup.setLngLat(e.lngLat).setHTML(html).addTo(map.current!)
-            })
-            map.current.on('mouseleave', 'counties', () => { if (map.current) { map.current.getCanvas().style.cursor = ''; popup.remove() } })
+            mapLayerSubscriptions.current = [
+                map.current.on('mousemove', 'counties', (e: maplibregl.MapLayerMouseEvent) => {
+                    if (!e.features || e.features.length === 0) return
+                    if (map.current) map.current.getCanvas().style.cursor = 'pointer'
+                    const props = e.features[0].properties as unknown as CountyMapProperties
+                    let html = `<div style="font-size:12px;line-height:1.5"><div style="font-weight:bold;margin-bottom:6px">${props.county_name || 'Unknown'} County</div><div>Exposure: <strong>${props.total_exposure?.toLocaleString()}</strong></div><div>Mean Abs Movement: <strong>${props.mean_value?.toFixed(4)}</strong></div><div>Max Abs Movement: ${props.max_value?.toFixed(4)}</div><div>Mean Shrinkage: ${props.mean_shrinkage_weight?.toFixed(3)}</div>`
+                    if (props.top_color) html += `<div style="margin-top:6px;padding-top:6px;border-top:1px solid #eee"><div style="font-size:11px;color:#666">Top Color Change:</div><div style="color:#d97706;font-weight:500">${props.top_color}</div></div>`
+                    html += `<div style="margin-top:6px;font-size:10px;color:#666">Click for details</div></div>`
+                    popup.setLngLat(e.lngLat).setHTML(html).addTo(map.current!)
+                }),
+                map.current.on('mouseleave', 'counties', () => { if (map.current) { map.current.getCanvas().style.cursor = ''; popup.remove() } }),
+            ]
         } catch { queueMicrotask(() => setError('Failed to update map layer')) }
     }, [])
 

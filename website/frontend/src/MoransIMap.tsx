@@ -107,6 +107,7 @@ function buildCountyDetail(fipsNum: number, freqData: FreqRow[], neighbors: Neig
 export function MoransIMap() {
     const mapContainer = useRef<HTMLDivElement>(null)
     const map = useRef<maplibregl.Map | null>(null)
+    const mapLayerSubscriptions = useRef<maplibregl.Subscription[]>([])
     const sourceDataRef = useRef<MoranSourceData | null>(null)
 
     const [sourceData, setSourceData] = useState<MoranSourceData | null>(null)
@@ -191,6 +192,8 @@ export function MoransIMap() {
 
     const updateMapLayer = useCallback((data: MoranMapData) => {
         if (!map.current) return
+        for (const subscription of mapLayerSubscriptions.current) subscription.unsubscribe()
+        mapLayerSubscriptions.current = []
         if (map.current.getLayer('counties')) map.current.removeLayer('counties')
         if (map.current.getLayer('counties-outline')) map.current.removeLayer('counties-outline')
         if (map.current.getSource('counties')) map.current.removeSource('counties')
@@ -203,18 +206,20 @@ export function MoransIMap() {
         map.current.addLayer({ id: 'counties', type: 'fill', source: 'counties', paint: { 'fill-color': ['interpolate', ['linear'], ['get', 'local'], minVal, colorScale(minVal), (minVal + maxVal) / 2, colorScale((minVal + maxVal) / 2), maxVal, colorScale(maxVal)], 'fill-opacity': 0.7 } })
         map.current.addLayer({ id: 'counties-outline', type: 'line', source: 'counties', paint: { 'line-color': '#888', 'line-width': 1 } })
         const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false })
-        map.current.on('mousemove', 'counties', (e: maplibregl.MapLayerMouseEvent) => {
-            if (!e.features || e.features.length === 0) return
-            if (map.current) map.current.getCanvas().style.cursor = 'pointer'
-            const props = e.features[0].properties as unknown as MoranMapProperties
-            popup.setLngLat(e.lngLat).setHTML(`<div style="font-size:12px;line-height:1.5"><div style="font-weight:bold;margin-bottom:6px">${props.county_name || 'Unknown'} County</div><div>Local Moran's I: <strong>${props.local?.toFixed(4) || 'N/A'}</strong></div><div style="margin-top:6px;font-size:10px;color:#666">Click for details</div></div>`).addTo(map.current!)
-        })
-        map.current.on('mouseleave', 'counties', () => { if (map.current) { map.current.getCanvas().style.cursor = ''; popup.remove() } })
-        map.current.on('click', 'counties', (e: maplibregl.MapLayerMouseEvent) => {
-            if (!e.features || e.features.length === 0) return
-            const props = e.features[0].properties as unknown as MoranMapProperties
-            if (props.fips) { loadCountyDetail(String(props.fips)); setTimeout(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100) }
-        })
+        mapLayerSubscriptions.current = [
+            map.current.on('mousemove', 'counties', (e: maplibregl.MapLayerMouseEvent) => {
+                if (!e.features || e.features.length === 0) return
+                if (map.current) map.current.getCanvas().style.cursor = 'pointer'
+                const props = e.features[0].properties as unknown as MoranMapProperties
+                popup.setLngLat(e.lngLat).setHTML(`<div style="font-size:12px;line-height:1.5"><div style="font-weight:bold;margin-bottom:6px">${props.county_name || 'Unknown'} County</div><div>Local Moran's I: <strong>${props.local?.toFixed(4) || 'N/A'}</strong></div><div style="margin-top:6px;font-size:10px;color:#666">Click for details</div></div>`).addTo(map.current!)
+            }),
+            map.current.on('mouseleave', 'counties', () => { if (map.current) { map.current.getCanvas().style.cursor = ''; popup.remove() } }),
+            map.current.on('click', 'counties', (e: maplibregl.MapLayerMouseEvent) => {
+                if (!e.features || e.features.length === 0) return
+                const props = e.features[0].properties as unknown as MoranMapProperties
+                if (props.fips) { loadCountyDetail(String(props.fips)); setTimeout(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100) }
+            }),
+        ]
     }, [loadCountyDetail])
 
     useEffect(() => {

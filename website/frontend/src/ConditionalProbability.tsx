@@ -70,6 +70,7 @@ function buildMapData(summaryRows: SummaryRow[], geoFeatures: GeoJSON.Feature[],
 export function ConditionalProbability() {
     const mapContainer = useRef<HTMLDivElement>(null)
     const map = useRef<maplibregl.Map | null>(null)
+    const mapLayerSubscriptions = useRef<maplibregl.Subscription[]>([])
     const selectedLandcoverRef = useRef<string>('')
     const sourceDataRef = useRef<ConditionalSourceData | null>(null)
 
@@ -170,6 +171,8 @@ export function ConditionalProbability() {
         if (!map.current) return
         try {
             if (!map.current.isStyleLoaded()) { map.current.once('styledata', () => applyMapLayer(data)); return }
+            for (const subscription of mapLayerSubscriptions.current) subscription.unsubscribe()
+            mapLayerSubscriptions.current = []
             if (map.current.getLayer('counties')) map.current.removeLayer('counties')
             if (map.current.getLayer('counties-outline')) map.current.removeLayer('counties-outline')
             if (map.current.getSource('counties')) map.current.removeSource('counties')
@@ -191,14 +194,16 @@ export function ConditionalProbability() {
             map.current.addLayer({ id: 'counties-outline', type: 'line', source: 'counties', paint: { 'line-color': '#888', 'line-width': 1 } })
 
             const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false })
-            map.current.on('mousemove', 'counties', (e: maplibregl.MapLayerMouseEvent) => {
-                if (!e.features || e.features.length === 0) return
-                if (map.current) map.current.getCanvas().style.cursor = 'pointer'
-                const props = e.features[0].properties as unknown as CountyMapProperties
-                const metricLabel = selectedMetric === 'kl_div' ? 'KL Divergence' : 'L1 Distance'
-                popup.setLngLat(e.lngLat).setHTML(`<div style="font-size:12px;line-height:1.5"><div style="font-weight:bold;margin-bottom:6px">${props.county_name} County</div><div>Exposure: <strong>${props.total_exposure?.toLocaleString()}</strong></div><div>Mean ${metricLabel}: <strong>${props.mean_value?.toFixed(4)}</strong></div><div>Neighbors: ${props.num_neighbors}</div><div style="margin-top:6px;font-size:10px;color:#666">Click for details</div></div>`).addTo(map.current!)
-            })
-            map.current.on('mouseleave', 'counties', () => { if (map.current) { map.current.getCanvas().style.cursor = ''; popup.remove() } })
+            mapLayerSubscriptions.current = [
+                map.current.on('mousemove', 'counties', (e: maplibregl.MapLayerMouseEvent) => {
+                    if (!e.features || e.features.length === 0) return
+                    if (map.current) map.current.getCanvas().style.cursor = 'pointer'
+                    const props = e.features[0].properties as unknown as CountyMapProperties
+                    const metricLabel = selectedMetric === 'kl_div' ? 'KL Divergence' : 'L1 Distance'
+                    popup.setLngLat(e.lngLat).setHTML(`<div style="font-size:12px;line-height:1.5"><div style="font-weight:bold;margin-bottom:6px">${props.county_name} County</div><div>Exposure: <strong>${props.total_exposure?.toLocaleString()}</strong></div><div>Mean ${metricLabel}: <strong>${props.mean_value?.toFixed(4)}</strong></div><div>Neighbors: ${props.num_neighbors}</div><div style="margin-top:6px;font-size:10px;color:#666">Click for details</div></div>`).addTo(map.current!)
+                }),
+                map.current.on('mouseleave', 'counties', () => { if (map.current) { map.current.getCanvas().style.cursor = ''; popup.remove() } }),
+            ]
         } catch { queueMicrotask(() => setError('Failed to update map layer')) }
     }, [selectedMetric])
 
