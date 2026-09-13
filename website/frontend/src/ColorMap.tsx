@@ -144,6 +144,7 @@ export function ColorMap() {
   const popup = useRef<maplibregl.Popup | null>(null)
   const dataRef = useRef<HexData | null>(null)
   const geoCache = useRef<Map<string, GeoJSON.FeatureCollection>>(new Map())
+  const mapReadyRef = useRef(false)
 
   const [loading, setLoading] = useState(true)
   const [loadingMsg, setLoadingMsg] = useState('Downloading hex data…')
@@ -235,7 +236,7 @@ export function ColorMap() {
         dataRef.current = data
         setLcTypes(data.lc_labels)
         setLoadingMsg('')
-        if (map.current?.loaded()) refresh()
+        if (mapReadyRef.current) refresh()
       })
       .catch(err => { setError(`Failed to load: ${err.message}`); setLoading(false) })
   }, [refresh])
@@ -270,6 +271,7 @@ export function ColorMap() {
     }
 
     currentMap.once('load', () => {
+      mapReadyRef.current = true
       refresh()
       currentMap.on('zoomend', onZoomEnd)
       currentMap.on('moveend', onMoveEnd)
@@ -280,6 +282,7 @@ export function ColorMap() {
       currentMap.off('moveend', onMoveEnd)
       currentMap.remove()
       map.current = null
+      mapReadyRef.current = false
     }
   }, [refresh])
 

@@ -1,4 +1,4 @@
-import { useReducer, useCallback, useRef, useEffect, useState } from 'react'
+import { useReducer, useCallback, useRef, useEffect, useLayoutEffect, useState } from 'react'
 import { IconArrowLeft } from '@tabler/icons-react'
 import { ThemeToggle } from './components/ThemeToggle'
 import { HeroSection } from './viz-intro/HeroSection'
@@ -89,7 +89,7 @@ export function VizIntroduction() {
     const mapApi = useRef<MapApi | null>(null)
     const stateRef = useRef(state)
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         stateRef.current = state
     }, [state])
 
