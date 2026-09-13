@@ -6,42 +6,9 @@ import { StickyGraphic, type MapApi, type SelectedPair } from './viz-intro/Stick
 import { ScrollNarration } from './viz-intro/ScrollNarration'
 import type { SceneId } from './viz-intro/constants'
 import { buildCountyDetailAllLandcover, type SummaryRow, type DetailRow, type CountyDetail } from './lib/conditionalPooling'
+import { processKLByFipsSdOnly, processPooledJsdByFips, selectComparisonData, type CaseStudyData, type ComparisonData } from './viz-intro/data'
 
-const SD_FIPS = [6025, 6059, 6065, 6073]
 const SD_FIPS_NUM = 6073
-
-function processPooledJsdByFips(
-    pooled: Record<string, { weighted_jsd: number; mean_jsd?: number }>
-): Record<string, number> {
-    const byFips: Record<string, number[]> = {}
-    Object.entries(pooled).forEach(([key, v]) => {
-        const [a, b] = key.split('-')
-        if (!byFips[a]) byFips[a] = []
-        if (!byFips[b]) byFips[b] = []
-        byFips[a].push(v.weighted_jsd)
-        byFips[b].push(v.weighted_jsd)
-    })
-    const out: Record<string, number> = {}
-    Object.entries(byFips).forEach(([fips, vals]) => {
-        out[fips] = Math.max(...vals)
-    })
-    return out
-}
-
-function processKLByFipsSdOnly(rows: SummaryRow[]): Record<string, number> {
-    const byFips: Record<number, number[]> = {}
-    rows.forEach((r) => {
-        if (!SD_FIPS.includes(r.fips)) return
-        if (!byFips[r.fips]) byFips[r.fips] = []
-        byFips[r.fips].push(r.kl_div)
-    })
-    const out: Record<string, number> = {}
-    Object.entries(byFips).forEach(([fips, vals]) => {
-        out[String(parseInt(fips, 10)).padStart(5, '0')] =
-            vals.reduce((a, b) => a + b, 0) / vals.length
-    })
-    return out
-}
 
 function goToDashboard() {
     window.location.href = '/'
@@ -106,12 +73,6 @@ function applyScene(
             api.spotlightCounties()
             break
     }
-}
-
-interface ComparisonData {
-    county_a: { name: string; total_count: number; clr: { distribution: { value: string; proportion: number; count: number }[] } }
-    county_b: { name: string; total_count: number; clr: { distribution: { value: string; proportion: number; count: number }[] } }
-    jsd: { original: number; pooled?: { weighted_jsd: number; mean_jsd: number } }
 }
 
 export function VizIntroduction() {
@@ -191,39 +152,11 @@ export function VizIntroduction() {
         setCountyKlDetail(detail)
     }, [])
 
-    const comparisonData: ComparisonData | null = (() => {
-        interface CaseStudyShape {
-            sd_vs_neighbors?: Record<string, ComparisonData & { jsd?: { pooled?: { weighted_jsd: number; mean_jsd: number } } }>
-        }
-        const sdNeighbors = (caseStudyData as CaseStudyShape | null)?.sd_vs_neighbors
-        // Prefer case study sd_vs_neighbors for SD pairs (has pooled JSD baked in)
-        const sdKeys = ['06073-06025', '06073-06059', '06073-06065', '06059-06073', '06025-06073', '06065-06073']
-        const isSDPair = (k1: string, k2: string) => sdKeys.includes(k1) || sdKeys.includes(k2)
-        if (!selectedPair) {
-            const fromCase = sdNeighbors?.['06073-06059']
-            if (fromCase?.jsd?.pooled) return fromCase as ComparisonData
-            const base = pairComparisons['06059-06073'] ?? pairComparisons['06073-06059'] ?? null
-            if (base && sdNeighbors) {
-                const sdEntry = sdNeighbors['06073-06059'] ?? sdNeighbors['06059-06073']
-                if (sdEntry?.jsd?.pooled)
-                    return { ...base, jsd: { ...base.jsd, pooled: sdEntry.jsd.pooled } }
-            }
-            return base
-        }
-        const key1 = `${selectedPair.fips_a}-${selectedPair.fips_b}`
-        const key2 = `${selectedPair.fips_b}-${selectedPair.fips_a}`
-        if (sdNeighbors && isSDPair(key1, key2)) {
-            const fromCase = sdNeighbors[key1] ?? sdNeighbors[key2]
-            if (fromCase?.jsd?.pooled) return fromCase as ComparisonData
-        }
-        const base = pairComparisons[key1] ?? pairComparisons[key2] ?? null
-        if (base && sdNeighbors) {
-            const sdEntry = sdNeighbors[key1] ?? sdNeighbors[key2]
-            if (sdEntry?.jsd?.pooled)
-                return { ...base, jsd: { ...base.jsd, pooled: sdEntry.jsd.pooled } }
-        }
-        return base
-    })()
+    const comparisonData = selectComparisonData({
+        pairComparisons,
+        caseStudyData: caseStudyData as CaseStudyData | null,
+        selectedPair,
+    })
 
     const handleMapReady = useCallback(
         (api: MapApi) => {
