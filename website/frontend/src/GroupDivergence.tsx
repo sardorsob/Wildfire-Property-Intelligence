@@ -4,11 +4,11 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import { cn } from './lib/utils'
 import { DASHBOARD_MAP_STYLE } from './lib/dashboardMap'
 
-function buildFillColor(metric: 'num_anomalies' | 'avg_divergence') {
+function buildFillColor(metric: 'num_anomalies' | 'avg_divergence'): maplibregl.ExpressionSpecification {
     const stops = metric === 'num_anomalies'
         ? [0, '#f7fbff', 2, '#deebf7', 4, '#c6dbef', 6, '#9ecae1', 8, '#6baed6', 10, '#3182bd']
         : [0, '#f7fbff', 0.4, '#deebf7', 0.5, '#c6dbef', 0.6, '#9ecae1', 0.7, '#6baed6', 0.8, '#3182bd']
-    return ['interpolate', ['linear'], ['get', metric], ...stops]
+    return ['interpolate', ['linear'], ['get', metric], ...stops] as maplibregl.ExpressionSpecification
 }
 
 const COLOR_MAP: Record<string, string> = {
@@ -110,14 +110,14 @@ export default function GroupDivergence() {
     const [mapData, setMapData] = useState<MapData | null>(null)
     const [byCounty, setByCounty] = useState<Record<string, LandcoverDivergence[]> | null>(null)
     const [allCountyColors, setAllCountyColors] = useState<Record<string, { by_landcover: LandcoverColors[] }> | null>(null)
-    const [selectedDivergences, setSelectedDivergences] = useState<LandcoverDivergence[] | null>(null)
     const [selectedFips, setSelectedFips] = useState<string | null>(null)
-    const [countyColors, setCountyColors] = useState<{ by_landcover: LandcoverColors[] } | null>(null)
     const [metric, setMetric] = useState<'num_anomalies' | 'avg_divergence'>('avg_divergence')
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [isFullscreen, setIsFullscreen] = useState(false)
     const [controlsOpen, setControlsOpen] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 640)
+    const selectedDivergences = selectedFips ? byCounty?.[selectedFips] ?? null : null
+    const countyColors = selectedFips ? allCountyColors?.[selectedFips] ?? null : null
 
     // Load all static data on mount
     useEffect(() => {
@@ -156,7 +156,7 @@ export default function GroupDivergence() {
 
             map.current.addSource('counties', {
                 type: 'geojson',
-                data: mapData as any,
+                data: mapData,
             })
 
             map.current.addLayer({
@@ -164,7 +164,7 @@ export default function GroupDivergence() {
                 type: 'fill',
                 source: 'counties',
                 paint: {
-                    'fill-color': buildFillColor(metric) as any,
+                    'fill-color': buildFillColor('avg_divergence'),
                     'fill-opacity': 0.7,
                 },
             })
@@ -206,8 +206,6 @@ export default function GroupDivergence() {
                     const fips = e.features[0].properties?.fips as string | undefined
                     if (fips) {
                         setSelectedFips(fips)
-                        setSelectedDivergences(byCounty?.[fips] ?? null)
-                        setCountyColors(allCountyColors?.[fips] ?? null)
                     }
                 }
             })
@@ -341,9 +339,7 @@ export default function GroupDivergence() {
                             <h3 className="text-base sm:text-lg font-semibold">County {selectedFips}</h3>
                             <button
                                 onClick={() => {
-                                    setSelectedDivergences(null)
                                     setSelectedFips(null)
-                                    setCountyColors(null)
                                 }}
                                 className="text-sm text-muted-foreground hover:text-foreground"
                             >

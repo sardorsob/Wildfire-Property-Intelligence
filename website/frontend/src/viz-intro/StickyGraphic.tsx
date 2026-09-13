@@ -75,6 +75,8 @@ interface StickyGraphicProps {
 }
 
 const SD_FIPS = '06073'
+const SD_REGION_FIPS = ['06025', '06059', '06065', '06073']
+const SD_SCENES: SceneId[] = ['spotlight', 'distributions', 'solution', 'postPooling', 'conclusion']
 
 /** Filter edges to only those from San Diego to its neighbors */
 function filterSdEdges(edges: FeatureCollection): FeatureCollection {
@@ -316,8 +318,6 @@ export function StickyGraphic({ scene, progress, onReady, onEdgeSelect, comparis
 
     const countyClickHandlerRef = useRef<((e: maplibregl.MapLayerMouseEvent) => void) | null>(null)
 
-    const SD_REGION_FIPS = ['06025', '06059', '06065', '06073']
-
     const showKLChoropleth = useCallback(
         (klByFips: Record<string, number>, onCountySelectCb: (fips: string) => void) => {
             const m = map.current
@@ -474,8 +474,6 @@ export function StickyGraphic({ scene, progress, onReady, onEdgeSelect, comparis
     )
 
     // Remove county click handler when leaving KL mode (spotlightCounties is called)
-    const spotlightCountiesRef = useRef(spotlightCounties)
-    spotlightCountiesRef.current = spotlightCounties
     const spotlightCountiesWithCleanup = useCallback(() => {
         const m = map.current
         if (m && countyClickHandlerRef.current) {
@@ -486,13 +484,12 @@ export function StickyGraphic({ scene, progress, onReady, onEdgeSelect, comparis
             }
             countyClickHandlerRef.current = null
         }
-        spotlightCountiesRef.current()
-    }, [])
+        spotlightCounties()
+    }, [spotlightCounties])
 
     // Keep map zoomed to SD region for spotlight, distributions, solution, postPooling, conclusion
-    const sdScenes: SceneId[] = ['spotlight', 'distributions', 'solution', 'postPooling', 'conclusion']
     useEffect(() => {
-        if (map.current && layersAdded.current && sdScenes.includes(scene)) {
+        if (map.current && layersAdded.current && SD_SCENES.includes(scene)) {
             map.current.flyTo({ center: SPOTLIGHT_CENTER, zoom: SPOTLIGHT_ZOOM, duration: 600 })
         }
     }, [scene])

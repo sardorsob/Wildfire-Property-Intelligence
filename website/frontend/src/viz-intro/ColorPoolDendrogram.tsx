@@ -89,9 +89,6 @@ export function ColorPoolDendrogram() {
         if (!data || !svgRef.current) return
 
         const root = d3.hierarchy(data) as d3.HierarchyPointNode<TreeNode>
-        root.each((d) => {
-            d.data as TreeNode & { depth?: number }
-        })
 
         const cluster = d3.cluster<TreeNode>().size([HEIGHT - 80, WIDTH - 120])
         cluster(root)

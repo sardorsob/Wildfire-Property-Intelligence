@@ -3,7 +3,8 @@ import 'katex/dist/katex.min.css'
 import { BlockMath, InlineMath } from 'react-katex'
 import { FileText, Github, Presentation } from 'lucide-react'
 import type { Page } from './components/app-sidebar'
-import { PdfViewerModal, getPdfTargetFromHash, type PdfModalTarget } from './components/PdfViewerModal'
+import { PdfViewerModal } from './components/PdfViewerModal'
+import { getPdfTargetFromHash, type PdfModalTarget } from './components/pdfHash'
 
 const AUTHORS = [
     { name: 'Angela Shen', email: 'a9shen@ucsd.edu' },
@@ -128,14 +129,13 @@ function MethodLink({ title, page, onPageChange }: {
 }
 
 export function HomePage({ onPageChange }: { onPageChange?: (page: Page) => void }) {
-    const [pdfModalTarget, setPdfModalTarget] = useState<PdfModalTarget>(null)
+    const [pdfModalTarget, setPdfModalTarget] = useState<PdfModalTarget>(getPdfTargetFromHash)
 
     useEffect(() => {
         const syncFromHash = () => {
             const target = getPdfTargetFromHash()
             setPdfModalTarget(target)
         }
-        syncFromHash()
         window.addEventListener('hashchange', syncFromHash)
         return () => window.removeEventListener('hashchange', syncFromHash)
     }, [])

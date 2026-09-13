@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import * as d3 from 'd3'
@@ -9,8 +9,10 @@ import { PROPERTY_COLORS } from './lib/propertyColors'
 
 interface BaselineDistribution { lc_type: string; clr: string; baseline_prop: number }
 interface StabilizedDistribution { fips: number; lc_type: string; clr: string; count: number; exposure: number; observed_prop: number; baseline_prop: number; shrinkage_weight: number; stabilized_prop: number; movement: number; abs_movement: number; effective_n: number; exposure_bin: string }
-interface CountyMapData { type: 'FeatureCollection'; features: GeoJSON.Feature[]; metric: string; lc_type: string | null; stats: { total_counties: number; mean_value: number; max_value: number } }
+interface CountyMapProperties { fips: string; county_name: string; mean_value: number; max_value: number; total_exposure: number; mean_shrinkage_weight: number; top_color: string; top_movement: number }
+interface CountyMapData { type: 'FeatureCollection'; features: GeoJSON.Feature<GeoJSON.Geometry, CountyMapProperties>[]; metric: string; lc_type: string | null; stats: { total_counties: number; mean_value: number; max_value: number } }
 interface CountyDetail { fips: string; county_name: string; by_landcover: Array<{ lc_type: string; total_exposure: number; mean_shrinkage_weight: number; max_abs_movement: number; num_categories: number; distributions: StabilizedDistribution[]; baseline: BaselineDistribution[] }>; total_landcover_types: number }
+interface EmpiricalBayesSourceData { baseline: BaselineDistribution[]; stabilized: StabilizedDistribution[]; geoFeatures: GeoJSON.Feature[] }
 
 function buildMapData(stabilized: StabilizedDistribution[], geoFeatures: GeoJSON.Feature[], lc: string): CountyMapData {
     const filtered = lc ? stabilized.filter(r => r.lc_type === lc) : stabilized
@@ -27,7 +29,7 @@ function buildMapData(stabilized: StabilizedDistribution[], geoFeatures: GeoJSON
         const fips = f.properties?.fips as string
         if (fips) geoByFips.set(fips, f)
     }
-    const features: GeoJSON.Feature[] = []
+    const features: GeoJSON.Feature<GeoJSON.Geometry, CountyMapProperties>[] = []
     for (const [fipsNum, data] of byFips.entries()) {
         const fipsStr = String(fipsNum).padStart(5, '0')
         const geo = geoByFips.get(fipsStr)
@@ -61,11 +63,9 @@ export function EmpiricalBayesPooling() {
     const mapContainer = useRef<HTMLDivElement>(null)
     const map = useRef<maplibregl.Map | null>(null)
     const selectedLandcoverRef = useRef<string>('')
-    const stabilizedRef = useRef<StabilizedDistribution[]>([])
-    const baselineRef = useRef<BaselineDistribution[]>([])
-    const geoFeaturesRef = useRef<GeoJSON.Feature[]>([])
+    const sourceDataRef = useRef<EmpiricalBayesSourceData | null>(null)
 
-    const [landcoverTypes, setLandcoverTypes] = useState<string[]>([])
+    const [sourceData, setSourceData] = useState<EmpiricalBayesSourceData | null>(null)
     const [selectedLandcover, setSelectedLandcover] = useState<string>('')
     const [mapData, setMapData] = useState<CountyMapData | null>(null)
     const [countyDetail, setCountyDetail] = useState<CountyDetail | null>(null)
@@ -73,11 +73,9 @@ export function EmpiricalBayesPooling() {
     const [showDetailPanel, setShowDetailPanel] = useState(false)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
-    const [legendRange, setLegendRange] = useState<{ min: number; max: number } | null>(null)
     const [isFullscreen, setIsFullscreen] = useState(false)
     const [controlsOpen, setControlsOpen] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 640)
     const [isMapReady, setIsMapReady] = useState(false)
-    const [dataLoaded, setDataLoaded] = useState(false)
 
     useEffect(() => { selectedLandcoverRef.current = selectedLandcover }, [selectedLandcover])
 
@@ -87,23 +85,50 @@ export function EmpiricalBayesPooling() {
             fetch('/data/bayesian-stabilized.json').then(r => r.json()),
             fetch('/data/group-divergence.json').then(r => r.json()),
         ]).then(([bl, stab, gd]) => {
-            baselineRef.current = bl
-            stabilizedRef.current = stab
-            geoFeaturesRef.current = gd.map.features
-            const lcs = [...new Set<string>(stab.map((r: StabilizedDistribution) => r.lc_type))].sort()
-            setLandcoverTypes(lcs)
-            setDataLoaded(true)
+            const loaded = { baseline: bl, stabilized: stab, geoFeatures: gd.map.features }
+            sourceDataRef.current = loaded
+            setSourceData(loaded)
             setLoading(false)
         }).catch(err => { setError(`Failed to load data: ${err.message}`); setLoading(false) })
     }, [])
 
     const loadCountyDetail = useCallback((fipsStr: string) => {
+        if (!sourceDataRef.current) return
         const fipsNum = parseInt(fipsStr, 10)
         const lc = selectedLandcoverRef.current
-        const detail = buildCountyDetail(fipsNum, stabilizedRef.current, baselineRef.current, geoFeaturesRef.current, lc)
+        const { stabilized, baseline, geoFeatures } = sourceDataRef.current
+        const detail = buildCountyDetail(fipsNum, stabilized, baseline, geoFeatures, lc)
         setCountyDetail(detail)
         setShowDetailPanel(true)
     }, [])
+
+    const landcoverTypes = useMemo(
+        () => sourceData ? [...new Set(sourceData.stabilized.map(r => r.lc_type))].sort() : [],
+        [sourceData]
+    )
+
+    const computedMapData = useMemo(() => {
+        if (!sourceData || !isMapReady) return null
+        return buildMapData(sourceData.stabilized, sourceData.geoFeatures, selectedLandcover)
+    }, [sourceData, isMapReady, selectedLandcover])
+
+    useEffect(() => {
+        if (!computedMapData) return
+        if (computedMapData.features.length > 0) {
+            queueMicrotask(() => setMapData(computedMapData))
+        } else {
+            queueMicrotask(() => setError('No data found for the selected filters'))
+        }
+    }, [computedMapData])
+
+    const legendRange = useMemo(() => {
+        if (!mapData) return null
+        const values = mapData.features.map(f => f.properties.mean_value).filter(v => !isNaN(v) && isFinite(v))
+        if (values.length === 0) return null
+        const min = Math.min(...values)
+        const max = Math.max(...values)
+        return min === max ? null : { min, max }
+    }, [mapData])
 
     useEffect(() => {
         if (!mapContainer.current || map.current) return
@@ -114,26 +139,19 @@ export function EmpiricalBayesPooling() {
             map.current.on('load', () => setIsMapReady(true))
             map.current.on('click', 'counties', (e) => {
                 if (e.features && e.features[0]) {
-                    const fips = (e.features[0].properties as any).fips
+                    const fips = (e.features[0].properties as unknown as CountyMapProperties).fips
                     if (fips) { loadCountyDetail(fips); setTimeout(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100) }
                 }
             })
             map.current.on('error', () => setError('Map initialization error'))
-        } catch { setError('Failed to initialize map') }
-        return () => { if (map.current) { map.current.remove(); map.current = null } setIsMapReady(false) }
+        } catch { queueMicrotask(() => setError('Failed to initialize map')) }
+        return () => { if (map.current) { map.current.remove(); map.current = null } }
     }, [loadCountyDetail])
 
-    useEffect(() => {
-        if (!dataLoaded || !isMapReady) return
-        const data = buildMapData(stabilizedRef.current, geoFeaturesRef.current, selectedLandcover)
-        if (data.features.length > 0) setMapData(data)
-        else setError('No data found for the selected filters')
-    }, [dataLoaded, isMapReady, selectedLandcover])
-
-    const updateMapLayer = (data: CountyMapData) => {
+    const updateMapLayer = useCallback(function applyMapLayer(data: CountyMapData) {
         if (!map.current) return
         try {
-            if (!map.current.isStyleLoaded()) { map.current.once('styledata', () => updateMapLayer(data)); return }
+            if (!map.current.isStyleLoaded()) { map.current.once('styledata', () => applyMapLayer(data)); return }
             if (map.current.getLayer('counties')) map.current.removeLayer('counties')
             if (map.current.getLayer('counties-outline')) map.current.removeLayer('counties-outline')
             if (map.current.getSource('counties')) map.current.removeSource('counties')
@@ -142,7 +160,6 @@ export function EmpiricalBayesPooling() {
             const values = data.features.map(f => f.properties?.mean_value).filter((v): v is number => typeof v === 'number' && !isNaN(v) && isFinite(v))
             if (values.length === 0) return
             const minVal = Math.min(...values); const maxVal = Math.max(...values)
-            if (minVal !== maxVal) setLegendRange({ min: minVal, max: maxVal }); else setLegendRange(null)
             if (minVal === maxVal) {
                 map.current.addLayer({ id: 'counties', type: 'fill', source: 'counties', paint: { 'fill-color': chartColors.primary, 'fill-opacity': 0.7 } })
             } else {
@@ -151,22 +168,20 @@ export function EmpiricalBayesPooling() {
             }
             map.current.addLayer({ id: 'counties-outline', type: 'line', source: 'counties', paint: { 'line-color': '#888', 'line-width': 1 } })
             const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false })
-            // @ts-expect-error MapLibre types
-            map.current.off('mousemove', 'counties'); map.current.off('mouseleave', 'counties')
-            map.current.on('mousemove', 'counties', (e) => {
+            map.current.on('mousemove', 'counties', (e: maplibregl.MapLayerMouseEvent) => {
                 if (!e.features || e.features.length === 0) return
                 if (map.current) map.current.getCanvas().style.cursor = 'pointer'
-                const props = e.features[0].properties as any
+                const props = e.features[0].properties as unknown as CountyMapProperties
                 let html = `<div style="font-size:12px;line-height:1.5"><div style="font-weight:bold;margin-bottom:6px">${props.county_name || 'Unknown'} County</div><div>Exposure: <strong>${props.total_exposure?.toLocaleString()}</strong></div><div>Mean Abs Movement: <strong>${props.mean_value?.toFixed(4)}</strong></div><div>Max Abs Movement: ${props.max_value?.toFixed(4)}</div><div>Mean Shrinkage: ${props.mean_shrinkage_weight?.toFixed(3)}</div>`
                 if (props.top_color) html += `<div style="margin-top:6px;padding-top:6px;border-top:1px solid #eee"><div style="font-size:11px;color:#666">Top Color Change:</div><div style="color:#d97706;font-weight:500">${props.top_color}</div></div>`
                 html += `<div style="margin-top:6px;font-size:10px;color:#666">Click for details</div></div>`
                 popup.setLngLat(e.lngLat).setHTML(html).addTo(map.current!)
             })
             map.current.on('mouseleave', 'counties', () => { if (map.current) { map.current.getCanvas().style.cursor = ''; popup.remove() } })
-        } catch { setError('Failed to update map layer') }
-    }
+        } catch { queueMicrotask(() => setError('Failed to update map layer')) }
+    }, [])
 
-    useEffect(() => { if (isMapReady && mapData && map.current && mapData.features.length > 0) updateMapLayer(mapData) }, [isMapReady, mapData])
+    useEffect(() => { if (isMapReady && mapData && map.current && mapData.features.length > 0) updateMapLayer(mapData) }, [isMapReady, mapData, updateMapLayer])
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape' && isFullscreen) setIsFullscreen(false) }
         window.addEventListener('keydown', handleKeyDown)
@@ -308,8 +323,9 @@ function ComparisonChart({ baseline, stabilized }: { baseline: BaselineDistribut
         const handleResize = () => renderChart()
         window.addEventListener('resize', handleResize)
         let obs: ResizeObserver | null = null
-        if (containerRef.current) { obs = new ResizeObserver(() => renderChart()); obs.observe(containerRef.current) }
-        return () => { window.removeEventListener('resize', handleResize); if (obs && containerRef.current) obs.unobserve(containerRef.current) }
+        const container = containerRef.current
+        if (container) { obs = new ResizeObserver(() => renderChart()); obs.observe(container) }
+        return () => { window.removeEventListener('resize', handleResize); if (obs && container) obs.unobserve(container) }
     }, [renderChart])
     return <div ref={containerRef} className="w-full overflow-x-auto"><svg ref={svgRef} className="w-full" style={{ minHeight: '300px' }}></svg></div>
 }

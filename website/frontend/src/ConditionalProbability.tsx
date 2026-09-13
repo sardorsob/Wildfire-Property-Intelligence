@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import * as d3 from 'd3'
@@ -8,7 +8,9 @@ import { DASHBOARD_MAP_STYLE } from './lib/dashboardMap'
 import { PROPERTY_COLORS } from './lib/propertyColors'
 import { buildCountyDetail, type ColorDistribution, type CountyDetail, type DetailRow, type SummaryRow } from './lib/conditionalPooling'
 
-interface CountyMapData { type: 'FeatureCollection'; features: GeoJSON.Feature[]; metric: string; lc_type: string | null; stats: { total_counties: number; mean_value: number; max_value: number } }
+interface CountyMapProperties { fips: string; county_name: string; mean_value: number; max_value: number; total_exposure: number; num_neighbors: number }
+interface CountyMapData { type: 'FeatureCollection'; features: GeoJSON.Feature<GeoJSON.Geometry, CountyMapProperties>[]; metric: string; lc_type: string | null; stats: { total_counties: number; mean_value: number; max_value: number } }
+interface ConditionalSourceData { summary: SummaryRow[]; detail: DetailRow[]; geoFeatures: GeoJSON.Feature[] }
 
 function buildMapData(summaryRows: SummaryRow[], geoFeatures: GeoJSON.Feature[], lc: string, metric: string): CountyMapData {
     const filtered = lc ? summaryRows.filter(r => r.lc_type === lc) : summaryRows
@@ -30,7 +32,7 @@ function buildMapData(summaryRows: SummaryRow[], geoFeatures: GeoJSON.Feature[],
         if (fips) geoByFips.set(fips, f)
     }
 
-    const features: GeoJSON.Feature[] = []
+    const features: GeoJSON.Feature<GeoJSON.Geometry, CountyMapProperties>[] = []
     for (const [fipsNum, data] of byFips.entries()) {
         const fipsStr = String(fipsNum).padStart(5, '0')
         const geo = geoByFips.get(fipsStr)
@@ -69,11 +71,9 @@ export function ConditionalProbability() {
     const mapContainer = useRef<HTMLDivElement>(null)
     const map = useRef<maplibregl.Map | null>(null)
     const selectedLandcoverRef = useRef<string>('')
-    const summaryRef = useRef<SummaryRow[]>([])
-    const detailRef2 = useRef<DetailRow[]>([])
-    const geoFeaturesRef = useRef<GeoJSON.Feature[]>([])
+    const sourceDataRef = useRef<ConditionalSourceData | null>(null)
 
-    const [landcoverTypes, setLandcoverTypes] = useState<string[]>([])
+    const [sourceData, setSourceData] = useState<ConditionalSourceData | null>(null)
     const [selectedLandcover, setSelectedLandcover] = useState<string>('')
     const [selectedMetric, setSelectedMetric] = useState<string>('kl_div')
     const [mapData, setMapData] = useState<CountyMapData | null>(null)
@@ -82,11 +82,9 @@ export function ConditionalProbability() {
     const [showDetailPanel, setShowDetailPanel] = useState(false)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
-    const [legendRange, setLegendRange] = useState<{ min: number; max: number } | null>(null)
     const [isFullscreen, setIsFullscreen] = useState(false)
     const [controlsOpen, setControlsOpen] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 640)
     const [isMapReady, setIsMapReady] = useState(false)
-    const [dataLoaded, setDataLoaded] = useState(false)
 
     useEffect(() => { selectedLandcoverRef.current = selectedLandcover }, [selectedLandcover])
 
@@ -98,12 +96,9 @@ export function ConditionalProbability() {
             fetch('/data/group-divergence.json').then(r => r.json()),
         ])
             .then(([summary, detail, gd]) => {
-                summaryRef.current = summary
-                detailRef2.current = detail
-                geoFeaturesRef.current = gd.map.features
-                const lcs = [...new Set<string>(summary.map((r: SummaryRow) => r.lc_type))].sort()
-                setLandcoverTypes(lcs)
-                setDataLoaded(true)
+                const loaded = { summary, detail, geoFeatures: gd.map.features }
+                sourceDataRef.current = loaded
+                setSourceData(loaded)
                 setLoading(false)
             })
             .catch(err => {
@@ -113,12 +108,42 @@ export function ConditionalProbability() {
     }, [])
 
     const loadCountyDetail = useCallback((fipsStr: string) => {
+        if (!sourceDataRef.current) return
         const fipsNum = parseInt(fipsStr, 10)
         const lc = selectedLandcoverRef.current
-        const detail = buildCountyDetail(fipsNum, summaryRef.current, detailRef2.current, geoFeaturesRef.current, lc)
+        const { summary, detail: detailRows, geoFeatures } = sourceDataRef.current
+        const detail = buildCountyDetail(fipsNum, summary, detailRows, geoFeatures, lc)
         setCountyDetail(detail)
         setShowDetailPanel(true)
     }, [])
+
+    const landcoverTypes = useMemo(
+        () => sourceData ? [...new Set(sourceData.summary.map(r => r.lc_type))].sort() : [],
+        [sourceData]
+    )
+
+    const computedMapData = useMemo(() => {
+        if (!sourceData || !isMapReady) return null
+        return buildMapData(sourceData.summary, sourceData.geoFeatures, selectedLandcover, selectedMetric)
+    }, [sourceData, isMapReady, selectedLandcover, selectedMetric])
+
+    useEffect(() => {
+        if (!computedMapData) return
+        if (computedMapData.features.length > 0) {
+            queueMicrotask(() => setMapData(computedMapData))
+        } else {
+            queueMicrotask(() => setError('No data found for the selected filters'))
+        }
+    }, [computedMapData])
+
+    const legendRange = useMemo(() => {
+        if (!mapData) return null
+        const values = mapData.features.map(f => f.properties.mean_value).filter(v => !isNaN(v) && isFinite(v))
+        if (values.length === 0) return null
+        const min = Math.min(...values)
+        const max = Math.max(...values)
+        return min === max ? null : { min, max }
+    }, [mapData])
 
     useEffect(() => {
         if (!mapContainer.current || map.current) return
@@ -129,7 +154,7 @@ export function ConditionalProbability() {
             map.current.addControl(new maplibregl.NavigationControl(), 'top-right')
             map.current.on('click', 'counties', (e) => {
                 if (e.features && e.features[0]) {
-                    const fips = (e.features[0].properties as any).fips
+                    const fips = (e.features[0].properties as unknown as CountyMapProperties).fips
                     if (fips) {
                         loadCountyDetail(fips)
                         setTimeout(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
@@ -137,25 +162,14 @@ export function ConditionalProbability() {
                 }
             })
             map.current.on('error', () => setError('Map initialization error'))
-        } catch { setError('Failed to initialize map') }
-        return () => { if (map.current) { map.current.remove(); map.current = null } setIsMapReady(false) }
+        } catch { queueMicrotask(() => setError('Failed to initialize map')) }
+        return () => { if (map.current) { map.current.remove(); map.current = null } }
     }, [loadCountyDetail])
 
-    // Rebuild map data when filters or data change
-    useEffect(() => {
-        if (!dataLoaded || !isMapReady) return
-        const data = buildMapData(summaryRef.current, geoFeaturesRef.current, selectedLandcover, selectedMetric)
-        if (data.features.length > 0) {
-            setMapData(data)
-        } else {
-            setError('No data found for the selected filters')
-        }
-    }, [dataLoaded, isMapReady, selectedLandcover, selectedMetric])
-
-    const updateMapLayer = useCallback((data: CountyMapData) => {
+    const updateMapLayer = useCallback(function applyMapLayer(data: CountyMapData) {
         if (!map.current) return
         try {
-            if (!map.current.isStyleLoaded()) { map.current.once('styledata', () => updateMapLayer(data)); return }
+            if (!map.current.isStyleLoaded()) { map.current.once('styledata', () => applyMapLayer(data)); return }
             if (map.current.getLayer('counties')) map.current.removeLayer('counties')
             if (map.current.getLayer('counties-outline')) map.current.removeLayer('counties-outline')
             if (map.current.getSource('counties')) map.current.removeSource('counties')
@@ -168,9 +182,6 @@ export function ConditionalProbability() {
             const minVal = Math.min(...values)
             const maxVal = Math.max(...values)
 
-            if (minVal !== maxVal) setLegendRange({ min: minVal, max: maxVal })
-            else setLegendRange(null)
-
             if (minVal === maxVal) {
                 map.current.addLayer({ id: 'counties', type: 'fill', source: 'counties', paint: { 'fill-color': chartColors.primary, 'fill-opacity': 0.7 } })
             } else {
@@ -180,17 +191,15 @@ export function ConditionalProbability() {
             map.current.addLayer({ id: 'counties-outline', type: 'line', source: 'counties', paint: { 'line-color': '#888', 'line-width': 1 } })
 
             const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false })
-            ;(map.current as any).off('mousemove', 'counties')
-            ;(map.current as any).off('mouseleave', 'counties')
-            map.current.on('mousemove', 'counties', (e: any) => {
+            map.current.on('mousemove', 'counties', (e: maplibregl.MapLayerMouseEvent) => {
                 if (!e.features || e.features.length === 0) return
                 if (map.current) map.current.getCanvas().style.cursor = 'pointer'
-                const props = e.features[0].properties as any
+                const props = e.features[0].properties as unknown as CountyMapProperties
                 const metricLabel = selectedMetric === 'kl_div' ? 'KL Divergence' : 'L1 Distance'
                 popup.setLngLat(e.lngLat).setHTML(`<div style="font-size:12px;line-height:1.5"><div style="font-weight:bold;margin-bottom:6px">${props.county_name} County</div><div>Exposure: <strong>${props.total_exposure?.toLocaleString()}</strong></div><div>Mean ${metricLabel}: <strong>${props.mean_value?.toFixed(4)}</strong></div><div>Neighbors: ${props.num_neighbors}</div><div style="margin-top:6px;font-size:10px;color:#666">Click for details</div></div>`).addTo(map.current!)
             })
             map.current.on('mouseleave', 'counties', () => { if (map.current) { map.current.getCanvas().style.cursor = ''; popup.remove() } })
-        } catch { setError('Failed to update map layer') }
+        } catch { queueMicrotask(() => setError('Failed to update map layer')) }
     }, [selectedMetric])
 
     useEffect(() => {
@@ -366,8 +375,9 @@ function ComparisonChart({ distributions }: { distributions: ColorDistribution[]
         const handleResize = () => renderChart()
         window.addEventListener('resize', handleResize)
         let obs: ResizeObserver | null = null
-        if (containerRef.current) { obs = new ResizeObserver(() => renderChart()); obs.observe(containerRef.current) }
-        return () => { window.removeEventListener('resize', handleResize); if (obs && containerRef.current) obs.unobserve(containerRef.current) }
+        const container = containerRef.current
+        if (container) { obs = new ResizeObserver(() => renderChart()); obs.observe(container) }
+        return () => { window.removeEventListener('resize', handleResize); if (obs && container) obs.unobserve(container) }
     }, [renderChart])
 
     return <div ref={containerRef} className="w-full overflow-x-auto"><svg ref={svgRef} className="w-full" style={{ minHeight: '300px' }}></svg></div>

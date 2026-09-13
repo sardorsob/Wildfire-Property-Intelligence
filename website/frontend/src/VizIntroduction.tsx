@@ -88,7 +88,10 @@ export function VizIntroduction() {
 
     const mapApi = useRef<MapApi | null>(null)
     const stateRef = useRef(state)
-    stateRef.current = state
+
+    useEffect(() => {
+        stateRef.current = state
+    }, [state])
 
     const [pairComparisons, setPairComparisons] = useState<Record<string, ComparisonData>>({})
     const [caseStudyData, setCaseStudyData] = useState<Record<string, unknown> | null>(null)

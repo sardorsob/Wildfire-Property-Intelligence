@@ -29,10 +29,9 @@ function getPdfHashPage(): Page | null {
 }
 
 export function Router() {
-    const [page, setPage] = useState<Page>('home')
+    const [page, setPage] = useState<Page>(() => getPdfHashPage() ?? 'home')
 
     useEffect(() => {
-        if (getPdfHashPage()) setPage('home')
         const handleHashChange = () => {
             if (getPdfHashPage()) setPage('home')
         }

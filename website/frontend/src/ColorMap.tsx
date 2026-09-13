@@ -62,6 +62,15 @@ interface HexData {
   cells: Cell[]
 }
 
+interface HexCellProperties {
+  clr: string
+  hex: string
+  lc: string
+  total: number
+  h3: string
+  res: number
+}
+
 function buildGeoJSON(
   data: HexData,
   lcFilter: string,
@@ -140,8 +149,6 @@ export function ColorMap() {
   const [loadingMsg, setLoadingMsg] = useState('Downloading hex data…')
   const [layerLoading, setLayerLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [isMapReady, setIsMapReady] = useState(false)
-  const [dataReady, setDataReady] = useState(false)
 
   const [lcTypes, setLcTypes] = useState<string[]>([])
   const [selectedLc, setSelectedLc] = useState('')
@@ -149,35 +156,6 @@ export function ColorMap() {
   const [stats, setStats] = useState<{ cells: number; res: number } | null>(null)
 
   const selectedLcRef = useRef('')
-  useEffect(() => { selectedLcRef.current = selectedLc }, [selectedLc])
-
-  useEffect(() => {
-    fetch('/data/h3-color-cells.json')
-      .then(r => r.json())
-      .then((data: HexData) => {
-        dataRef.current = data
-        setLcTypes(data.lc_labels)
-        setDataReady(true)
-        setLoadingMsg('')
-      })
-      .catch(err => { setError(`Failed to load: ${err.message}`); setLoading(false) })
-  }, [])
-
-  useEffect(() => {
-    if (!mapContainer.current || map.current) return
-    const isMobile = window.innerWidth < 640
-    map.current = new maplibregl.Map({
-      container: mapContainer.current,
-      style: DASHBOARD_MAP_STYLE,
-      center: [-119.5, 37.0],
-      zoom: isMobile ? 4.5 : 5.5,
-    })
-    map.current.addControl(new maplibregl.NavigationControl(), 'top-right')
-    popup.current = new maplibregl.Popup({ closeButton: false, closeOnClick: false, maxWidth: '260px' })
-    map.current.once('load', () => setIsMapReady(true))
-    map.current.on('error', () => setError('Map error'))
-    return () => { map.current?.remove(); map.current = null }
-  }, [])
 
   const updateLayer = useCallback((res: number, lcFilter: string, bounds: maplibregl.LngLatBounds | null) => {
     if (!map.current || !dataRef.current) return
@@ -222,10 +200,10 @@ export function ColorMap() {
         },
       })
 
-      map.current.on('mousemove', 'hexcells-fill', (e: any) => {
+      map.current.on('mousemove', 'hexcells-fill', (e: maplibregl.MapLayerMouseEvent) => {
         if (!e.features?.length) return
         map.current!.getCanvas().style.cursor = 'pointer'
-        const p = e.features[0].properties as any
+        const p = e.features[0].properties as unknown as HexCellProperties
         popup.current!
           .setLngLat(e.lngLat)
           .setHTML(popupHtml(p))
@@ -251,13 +229,32 @@ export function ColorMap() {
   }, [updateLayer])
 
   useEffect(() => {
-    if (!dataReady || !isMapReady) return
-    refresh()
-  }, [dataReady, isMapReady, refresh])
+    fetch('/data/h3-color-cells.json')
+      .then(r => r.json())
+      .then((data: HexData) => {
+        dataRef.current = data
+        setLcTypes(data.lc_labels)
+        setLoadingMsg('')
+        if (map.current?.loaded()) refresh()
+      })
+      .catch(err => { setError(`Failed to load: ${err.message}`); setLoading(false) })
+  }, [refresh])
 
   useEffect(() => {
-    if (!isMapReady || !map.current) return
-    let lastRes = zoomToRes(map.current.getZoom())
+    if (!mapContainer.current || map.current) return
+    const isMobile = window.innerWidth < 640
+    const currentMap = new maplibregl.Map({
+      container: mapContainer.current,
+      style: DASHBOARD_MAP_STYLE,
+      center: [-119.5, 37.0],
+      zoom: isMobile ? 4.5 : 5.5,
+    })
+    map.current = currentMap
+    currentMap.addControl(new maplibregl.NavigationControl(), 'top-right')
+    popup.current = new maplibregl.Popup({ closeButton: false, closeOnClick: false, maxWidth: '260px' })
+    currentMap.on('error', () => setError('Map error'))
+
+    let lastRes = zoomToRes(currentMap.getZoom())
 
     const onZoomEnd = () => {
       const newRes = zoomToRes(map.current!.getZoom())
@@ -272,20 +269,26 @@ export function ColorMap() {
       if (zoomToRes(map.current!.getZoom()) === 9) refresh()
     }
 
-    map.current.on('zoomend', onZoomEnd)
-    map.current.on('moveend', onMoveEnd)
-    return () => {
-      map.current?.off('zoomend', onZoomEnd)
-      map.current?.off('moveend', onMoveEnd)
-    }
-  }, [isMapReady, refresh])
+    currentMap.once('load', () => {
+      refresh()
+      currentMap.on('zoomend', onZoomEnd)
+      currentMap.on('moveend', onMoveEnd)
+    })
 
-  const isFirst = useRef(true)
-  useEffect(() => {
-    if (isFirst.current) { isFirst.current = false; return }
+    return () => {
+      currentMap.off('zoomend', onZoomEnd)
+      currentMap.off('moveend', onMoveEnd)
+      currentMap.remove()
+      map.current = null
+    }
+  }, [refresh])
+
+  const handleLandcoverChange = (value: string) => {
+    selectedLcRef.current = value
+    setSelectedLc(value)
     geoCache.current.clear()
     refresh()
-  }, [selectedLc, refresh])
+  }
 
   return (
     <div className="relative flex-1 min-h-0">
@@ -319,7 +322,7 @@ export function ColorMap() {
             <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Landcover</span>
             <select
               value={selectedLc}
-              onChange={e => setSelectedLc(e.target.value)}
+              onChange={e => handleLandcoverChange(e.target.value)}
               className="px-3 py-1.5 text-xs border border-border rounded bg-background cursor-pointer focus:outline-none focus:border-sage-400"
             >
               <option value="">All Types</option>
@@ -360,7 +363,7 @@ export function ColorMap() {
   )
 }
 
-function popupHtml(p: { clr: string; hex: string; lc: string; total: number; h3: string; res: number }) {
+function popupHtml(p: HexCellProperties) {
   return `
         <div style="font-size:12px;line-height:1.6">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">

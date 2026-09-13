@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { cn } from './lib/utils'
@@ -30,6 +30,11 @@ interface C2STData {
         min_accuracy: number
         max_accuracy: number
     }
+}
+
+interface C2STSourceData {
+    rows: C2STRow[]
+    lc_types: string[]
 }
 
 interface SelectedPair {
@@ -134,19 +139,15 @@ export function C2STMap() {
     const map = useRef<maplibregl.Map | null>(null)
     const comparisonRef = useRef<HTMLDivElement>(null)
     const [loading, setLoading] = useState(true)
-    const [allRows, setAllRows] = useState<C2STRow[]>([])
-    const [pairComparisons, setPairComparisons] = useState<Record<string, any>>({})
-    const [data, setData] = useState<C2STData | null>(null)
+    const [sourceData, setSourceData] = useState<C2STSourceData | null>(null)
+    const [pairComparisons, setPairComparisons] = useState<Record<string, CountyComparison>>({})
     const [error, setError] = useState<string | null>(null)
-    const [lcTypes, setLcTypes] = useState<string[]>([])
     const [selectedLc, setSelectedLc] = useState<string>('')
     const [isFullscreen, setIsFullscreen] = useState(false)
     const [controlsOpen, setControlsOpen] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 640)
 
     const [selectedPair, setSelectedPair] = useState<SelectedPair | null>(null)
-    const [pairComparison, setPairComparison] = useState<PairComparison | null>(null)
     const [selectedLcType, setSelectedLcType] = useState<string | null>(null)
-    const [countyComparison, setCountyComparison] = useState<CountyComparison | null>(null)
     const [selectedFeature, setSelectedFeature] = useState<'clr' | 'bldgtype' | 'st_damcat'>('clr')
     const [showComparisonPanel, setShowComparisonPanel] = useState(false)
 
@@ -157,11 +158,8 @@ export function C2STMap() {
             fetch('/data/county-pair-comparisons.json').then(r => r.json()),
         ])
             .then(([c2st, pairs]) => {
-                setAllRows(c2st.rows)
-                setLcTypes(c2st.lc_types)
+                setSourceData(c2st)
                 setPairComparisons(pairs)
-                const { edges, stats } = buildEdgesGeoJSON(c2st.rows, '')
-                setData({ edges, lc_types: c2st.lc_types, stats })
                 setLoading(false)
             })
             .catch(err => {
@@ -170,18 +168,16 @@ export function C2STMap() {
             })
     }, [])
 
-    // Recompute edges when filter changes
-    useEffect(() => {
-        if (allRows.length === 0) return
-        const { edges, stats } = buildEdgesGeoJSON(allRows, selectedLc)
-        setData(prev => prev ? { ...prev, edges, stats } : null)
-    }, [selectedLc, allRows])
+    const data = useMemo<C2STData | null>(() => {
+        if (!sourceData) return null
+        const { edges, stats } = buildEdgesGeoJSON(sourceData.rows, selectedLc)
+        return { edges, lc_types: sourceData.lc_types, stats }
+    }, [selectedLc, sourceData])
 
-    // Build pair comparison from c2st rows when pair selected
-    useEffect(() => {
-        if (!selectedPair) return
+    const pairComparison = useMemo<PairComparison | null>(() => {
+        if (!selectedPair || !sourceData) return null
         const { fips_a, fips_b } = selectedPair
-        const pairRows = allRows.filter(r => r.fips_a === fips_a && r.fips_b === fips_b)
+        const pairRows = sourceData.rows.filter(r => r.fips_a === fips_a && r.fips_b === fips_b)
         const byLc: LcAccuracy[] = pairRows
             .filter(r => r.accuracy !== null && r.n_a >= 50 && r.n_b >= 50)
             .map(r => ({
@@ -197,30 +193,21 @@ export function C2STMap() {
         const insufficient: InsufficientData[] = pairRows
             .filter(r => r.accuracy === null || r.n_a < 50 || r.n_b < 50)
             .map(r => ({ lc_type: r.lc_type, n_a: r.n_a, n_b: r.n_b }))
-        setPairComparison({
+        return {
             fips_a, fips_b,
             county_a: selectedPair.county_a,
             county_b: selectedPair.county_b,
             by_landcover: byLc,
             insufficient_data: insufficient,
-        })
-        setSelectedLcType(null)
-        setCountyComparison(null)
-    }, [selectedPair, allRows])
+        }
+    }, [selectedPair, sourceData])
 
-    // Load county comparison from static file when lc type selected
-    useEffect(() => {
-        if (!selectedPair || !selectedLcType) return
+    const countyComparison = useMemo<CountyComparison | null>(() => {
+        if (!selectedPair || !selectedLcType) return null
         const key = `${selectedPair.fips_a}-${selectedPair.fips_b}`
         const entry = pairComparisons[key]
-        if (entry) {
-            setCountyComparison({
-                county_a: entry.county_a,
-                county_b: entry.county_b,
-            })
-        } else {
-            setCountyComparison({ county_a: { name: '', total_count: 0, clr: { distribution: [], vocab_size: 0 }, bldgtype: { distribution: [], vocab_size: 0 }, st_damcat: { distribution: [], vocab_size: 0 } }, county_b: { name: '', total_count: 0, clr: { distribution: [], vocab_size: 0 }, bldgtype: { distribution: [], vocab_size: 0 }, st_damcat: { distribution: [], vocab_size: 0 } }, error: 'No comparison data available' })
-        }
+        if (entry) return { county_a: entry.county_a, county_b: entry.county_b }
+        return { county_a: { name: '', total_count: 0, clr: { distribution: [], vocab_size: 0 }, bldgtype: { distribution: [], vocab_size: 0 }, st_damcat: { distribution: [], vocab_size: 0 } }, county_b: { name: '', total_count: 0, clr: { distribution: [], vocab_size: 0 }, bldgtype: { distribution: [], vocab_size: 0 }, st_damcat: { distribution: [], vocab_size: 0 } }, error: 'No comparison data available' }
     }, [selectedPair, selectedLcType, pairComparisons])
 
     useEffect(() => {
@@ -282,6 +269,7 @@ export function C2STMap() {
             map.current.on('click', 'edges-line', (e) => {
                 if (!e.features || e.features.length === 0) return
                 const props = e.features[0].properties
+                setSelectedLcType(null)
                 setSelectedPair({ fips_a: props.fips_a, fips_b: props.fips_b, county_a: props.county_a, county_b: props.county_b })
                 map.current!.setFilter('selected-edge', ['all', ['==', ['get', 'fips_a'], props.fips_a], ['==', ['get', 'fips_b'], props.fips_b]])
                 setTimeout(() => comparisonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
@@ -340,7 +328,7 @@ export function C2STMap() {
                         <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Display</span>
                         <select value={selectedLc} onChange={e => setSelectedLc(e.target.value)} className="px-3 py-1.5 text-xs border border-border rounded bg-background cursor-pointer focus:outline-none focus:border-sage-400">
                             <option value="">All (weighted average)</option>
-                            {lcTypes.map(lc => <option key={lc} value={lc}>{lc}</option>)}
+                            {sourceData?.lc_types.map(lc => <option key={lc} value={lc}>{lc}</option>)}
                         </select>
                     </div>
                     <button className="px-3 py-1.5 border border-[var(--button-accent)] rounded-sm bg-muted/50 text-[11px] font-medium text-[var(--button-accent)] cursor-pointer uppercase tracking-wide transition-all duration-150 hover:bg-[var(--button-accent)]/10" onClick={() => setIsFullscreen(!isFullscreen)}>

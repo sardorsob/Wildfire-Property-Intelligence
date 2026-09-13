@@ -3,8 +3,7 @@
 import { useEffect } from 'react'
 import { X } from 'lucide-react'
 import { Button } from './ui/button'
-
-export type PdfModalTarget = 'poster' | 'paper' | null
+import { getPdfTargetFromHash, type PdfModalTarget } from './pdfHash'
 
 const PDF_SOURCES: Record<Exclude<PdfModalTarget, null>, { path: string; title: string }> = {
   poster: {
@@ -15,12 +14,6 @@ const PDF_SOURCES: Record<Exclude<PdfModalTarget, null>, { path: string; title: 
     path: '/images/capstone_paper.pdf',
     title: 'Capstone Report',
   },
-}
-
-export function getPdfTargetFromHash(): PdfModalTarget {
-  const hash = window.location.hash?.replace('#', '')
-  if (hash === 'poster' || hash === 'paper') return hash
-  return null
 }
 
 interface PdfViewerModalProps {

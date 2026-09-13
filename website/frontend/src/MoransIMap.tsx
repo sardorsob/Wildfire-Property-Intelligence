@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import * as d3 from 'd3'
@@ -7,9 +7,11 @@ import { DASHBOARD_MAP_STYLE } from './lib/dashboardMap'
 
 interface FreqRow { fips: number; lc_type: string; bldgtype: string; freq: number }
 interface NeighborRow { county_fips: number; neighbor_fips: number }
-interface MoranMapData { type: 'FeatureCollection'; features: GeoJSON.Feature[]; stats: { total_counties: number; mean_local: number; max_local: number; min_local: number; std_local: number } }
+interface MoranMapProperties { fips: string; county_name: string; local: number; x_value: number | undefined }
+interface MoranMapData { type: 'FeatureCollection'; features: GeoJSON.Feature<GeoJSON.Geometry, MoranMapProperties>[]; stats: { total_counties: number; mean_local: number; max_local: number; min_local: number; std_local: number } }
 interface CategoryDetail { lc_type: string; bldgtype: string; frequency: number; neighbor_mean: number; neighbor_min: number; neighbor_max: number; neighbor_count: number }
 interface CountyDetail { fips: string; county_name: string; num_neighbors: number; by_category: CategoryDetail[]; total_categories: number }
+interface MoranSourceData { frequencies: FreqRow[]; neighbors: NeighborRow[]; geoFeatures: GeoJSON.Feature[] }
 
 function computeMoransI(freqData: FreqRow[], neighbors: NeighborRow[], geoFeatures: GeoJSON.Feature[], lc: string, bldg: string): MoranMapData | null {
     // Filter and group by fips
@@ -56,7 +58,7 @@ function computeMoransI(freqData: FreqRow[], neighbors: NeighborRow[], geoFeatur
         if (fp) geoByFips.set(fp, f)
     }
 
-    const features: GeoJSON.Feature[] = []
+    const features: GeoJSON.Feature<GeoJSON.Geometry, MoranMapProperties>[] = []
     for (const fips of fipsList) {
         const fipsStr = String(fips).padStart(5, '0')
         const geo = geoByFips.get(fipsStr)
@@ -105,10 +107,9 @@ function buildCountyDetail(fipsNum: number, freqData: FreqRow[], neighbors: Neig
 export function MoransIMap() {
     const mapContainer = useRef<HTMLDivElement>(null)
     const map = useRef<maplibregl.Map | null>(null)
-    const freqRef = useRef<FreqRow[]>([])
-    const neighborsRef = useRef<NeighborRow[]>([])
-    const geoFeaturesRef = useRef<GeoJSON.Feature[]>([])
+    const sourceDataRef = useRef<MoranSourceData | null>(null)
 
+    const [sourceData, setSourceData] = useState<MoranSourceData | null>(null)
     const [mapData, setMapData] = useState<MoranMapData | null>(null)
     const [countyDetail, setCountyDetail] = useState<CountyDetail | null>(null)
     const [showDetailPanel, setShowDetailPanel] = useState(false)
@@ -116,12 +117,8 @@ export function MoransIMap() {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [controlsOpen, setControlsOpen] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 640)
-    const [legendRange, setLegendRange] = useState<{ min: number; max: number } | null>(null)
-    const [landcoverTypes, setLandcoverTypes] = useState<string[]>([])
-    const [buildingTypes, setBuildingTypes] = useState<string[]>([])
     const [selectedLandcover, setSelectedLandcover] = useState<string>('')
     const [selectedBuildingType, setSelectedBuildingType] = useState<string>('')
-    const [dataLoaded, setDataLoaded] = useState(false)
     const [isMapReady, setIsMapReady] = useState(false)
 
     const selectedLcRef = useRef('')
@@ -135,35 +132,47 @@ export function MoransIMap() {
             fetch('/data/ca-county-neighbors.json').then(r => r.json()),
             fetch('/data/group-divergence.json').then(r => r.json()),
         ]).then(([freq, nbrs, gd]) => {
-            freqRef.current = freq
-            neighborsRef.current = nbrs
-            geoFeaturesRef.current = gd.map.features
-            const lcs = [...new Set<string>(freq.map((r: FreqRow) => r.lc_type))].sort()
-            const bldgs = [...new Set<string>(freq.map((r: FreqRow) => r.bldgtype))].sort()
-            setLandcoverTypes(lcs)
-            setBuildingTypes(bldgs)
-            setDataLoaded(true)
+            const loaded = { frequencies: freq, neighbors: nbrs, geoFeatures: gd.map.features }
+            sourceDataRef.current = loaded
+            setSourceData(loaded)
             setLoading(false)
         }).catch(err => { setError(`Failed to load data: ${err.message}`); setLoading(false) })
     }, [])
 
-    // Recompute when filters or data change
+    const landcoverTypes = useMemo(
+        () => sourceData ? [...new Set(sourceData.frequencies.map(r => r.lc_type))].sort() : [],
+        [sourceData]
+    )
+
+    const buildingTypes = useMemo(
+        () => sourceData ? [...new Set(sourceData.frequencies.map(r => r.bldgtype))].sort() : [],
+        [sourceData]
+    )
+
+    const computedMapData = useMemo(() => {
+        if (!sourceData || !isMapReady) return null
+        return computeMoransI(sourceData.frequencies, sourceData.neighbors, sourceData.geoFeatures, selectedLandcover, selectedBuildingType)
+    }, [sourceData, isMapReady, selectedLandcover, selectedBuildingType])
+
     useEffect(() => {
-        if (!dataLoaded || !isMapReady) return
-        const result = computeMoransI(freqRef.current, neighborsRef.current, geoFeaturesRef.current, selectedLandcover, selectedBuildingType)
-        if (result && result.features.length > 0) {
-            setMapData(result)
-            const scores = result.features.map(f => f.properties?.local as number).filter(v => v !== null && !isNaN(v))
-            if (scores.length > 0) setLegendRange({ min: Math.min(...scores), max: Math.max(...scores) })
-        } else {
-            setError('No data found for the selected filters')
-            setLegendRange(null)
+        if (computedMapData?.features.length) {
+            queueMicrotask(() => setMapData(computedMapData))
+        } else if (sourceData && isMapReady) {
+            queueMicrotask(() => setError('No data found for the selected filters'))
         }
-    }, [dataLoaded, isMapReady, selectedLandcover, selectedBuildingType])
+    }, [computedMapData, sourceData, isMapReady])
+
+    const legendRange = useMemo(() => {
+        if (!computedMapData?.features.length) return null
+        const scores = computedMapData.features.map(f => f.properties.local).filter(v => !isNaN(v))
+        return scores.length > 0 ? { min: Math.min(...scores), max: Math.max(...scores) } : null
+    }, [computedMapData])
 
     const loadCountyDetail = useCallback((fipsStr: string) => {
+        if (!sourceDataRef.current) return
         const fipsNum = parseInt(fipsStr, 10)
-        const detail = buildCountyDetail(fipsNum, freqRef.current, neighborsRef.current, geoFeaturesRef.current, selectedLcRef.current, selectedBldgRef.current)
+        const { frequencies, neighbors, geoFeatures } = sourceDataRef.current
+        const detail = buildCountyDetail(fipsNum, frequencies, neighbors, geoFeatures, selectedLcRef.current, selectedBldgRef.current)
         setCountyDetail(detail)
         setShowDetailPanel(true)
     }, [])
@@ -176,7 +185,7 @@ export function MoransIMap() {
             map.current.addControl(new maplibregl.NavigationControl(), 'top-right')
             map.current.once('load', () => setIsMapReady(true))
             map.current.on('error', () => setError('Map initialization error'))
-        } catch { setError('Failed to initialize map') }
+        } catch { queueMicrotask(() => setError('Failed to initialize map')) }
         return () => { if (map.current) { map.current.remove(); map.current = null } }
     }, [])
 
@@ -194,19 +203,16 @@ export function MoransIMap() {
         map.current.addLayer({ id: 'counties', type: 'fill', source: 'counties', paint: { 'fill-color': ['interpolate', ['linear'], ['get', 'local'], minVal, colorScale(minVal), (minVal + maxVal) / 2, colorScale((minVal + maxVal) / 2), maxVal, colorScale(maxVal)], 'fill-opacity': 0.7 } })
         map.current.addLayer({ id: 'counties-outline', type: 'line', source: 'counties', paint: { 'line-color': '#888', 'line-width': 1 } })
         const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false })
-        ;(map.current as any).off('mousemove', 'counties')
-        ;(map.current as any).off('mouseleave', 'counties')
-        ;(map.current as any).off('click', 'counties')
-        map.current.on('mousemove', 'counties', (e: any) => {
+        map.current.on('mousemove', 'counties', (e: maplibregl.MapLayerMouseEvent) => {
             if (!e.features || e.features.length === 0) return
             if (map.current) map.current.getCanvas().style.cursor = 'pointer'
-            const props = e.features[0].properties as any
+            const props = e.features[0].properties as unknown as MoranMapProperties
             popup.setLngLat(e.lngLat).setHTML(`<div style="font-size:12px;line-height:1.5"><div style="font-weight:bold;margin-bottom:6px">${props.county_name || 'Unknown'} County</div><div>Local Moran's I: <strong>${props.local?.toFixed(4) || 'N/A'}</strong></div><div style="margin-top:6px;font-size:10px;color:#666">Click for details</div></div>`).addTo(map.current!)
         })
         map.current.on('mouseleave', 'counties', () => { if (map.current) { map.current.getCanvas().style.cursor = ''; popup.remove() } })
-        map.current.on('click', 'counties', (e: any) => {
+        map.current.on('click', 'counties', (e: maplibregl.MapLayerMouseEvent) => {
             if (!e.features || e.features.length === 0) return
-            const props = e.features[0].properties as any
+            const props = e.features[0].properties as unknown as MoranMapProperties
             if (props.fips) { loadCountyDetail(String(props.fips)); setTimeout(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100) }
         })
     }, [loadCountyDetail])

@@ -53,7 +53,7 @@ function NarrationCard({ children, accent = '#21918c' }: { children: React.React
     )
 }
 
-function ConclusionCard({ visible: _visible }: { visible: boolean }) {
+function ConclusionCard() {
     return (
         <div
             className="pointer-events-auto w-full max-w-4xl"
@@ -77,7 +77,7 @@ function ConclusionCard({ visible: _visible }: { visible: boolean }) {
     )
 }
 
-function SolutionCard({ visible: _visible }: { visible: boolean }) {
+function SolutionCard() {
     return (
         <div
             className="pointer-events-auto w-full max-w-4xl"
@@ -183,7 +183,7 @@ export function ScrollNarration({ onSceneEnter, onSceneProgress, comparisonData,
                 {/* Scene 4: Our solution — greedy color pooling with dendrogram (centered) */}
                 <Step data="solution">
                     <div className="flex min-h-[120vh] items-center justify-center px-6 md:px-16">
-                        <SolutionCard visible={activeScene === 'solution'} />
+                        <SolutionCard />
                     </div>
                 </Step>
 
@@ -202,7 +202,7 @@ export function ScrollNarration({ onSceneEnter, onSceneProgress, comparisonData,
                 {/* Scene 6: Conclusion — centered box from report sections 4-6 */}
                 <Step data="conclusion">
                     <div className="flex min-h-[120vh] items-center justify-center px-6 md:px-16">
-                        <ConclusionCard visible={activeScene === 'conclusion'} />
+                        <ConclusionCard />
                     </div>
                 </Step>
             </Scrollama>
