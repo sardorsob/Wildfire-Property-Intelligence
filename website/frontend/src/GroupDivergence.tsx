@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { cn } from './lib/utils'
-
-const MAP_STYLE = 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json'
+import { DASHBOARD_MAP_STYLE } from './lib/dashboardMap'
 
 function buildFillColor(metric: 'num_anomalies' | 'avg_divergence') {
     const stops = metric === 'num_anomalies'
@@ -145,7 +144,7 @@ export default function GroupDivergence() {
         const isMobile = window.innerWidth < 640
         map.current = new maplibregl.Map({
             container: mapContainer.current,
-            style: MAP_STYLE,
+            style: DASHBOARD_MAP_STYLE,
             center: [-119.4, 37.0],
             zoom: isMobile ? 4.5 : 5.5,
         })

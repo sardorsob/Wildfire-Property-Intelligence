@@ -2,19 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { cn } from './lib/utils'
-
-const MAP_STYLE = 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json'
-
-const COLOR_MAP: Record<string, string> = {
-    amber: '#FFBF00', aqua: '#00FFFF', aquamarine: '#7FFFD4', auburn: '#922724', azure: '#F0FFFF',
-    bar: '#888888', beige: '#F5F5DC', blue: '#0000FF', brown: '#A52A2A', cocoa: '#D2691E',
-    coffee: '#6F4E37', crimson: '#DC143C', emerald: '#50C878', foo: '#888888', gold: '#FFD700',
-    gray: '#808080', green: '#008000', grey: '#808080', indigo: '#4B0082', ivory: '#FFFFF0',
-    lavender: '#E6E6FA', lemon: '#FFF700', lilac: '#C8A2C8', maroon: '#800000', navy: '#000080',
-    olive: '#808000', orange: '#FFA500', plum: '#8E4585', purple: '#800080', red: '#FF0000',
-    sage: '#9DC183', scarlet: '#FF2400', sienna: '#A0522D', tan: '#D2B48C', terracotta: '#E2725B',
-    verde: '#00A86B', yellow: '#FFFF00', alabaster: '#F2F0E6',
-}
+import { DASHBOARD_MAP_STYLE } from './lib/dashboardMap'
+import { PROPERTY_COLORS } from './lib/propertyColors'
 
 interface C2STRow {
     fips_a: string
@@ -239,7 +228,7 @@ export function C2STMap() {
         const isMobile = window.innerWidth < 640
         map.current = new maplibregl.Map({
             container: mapContainer.current,
-            style: MAP_STYLE,
+            style: DASHBOARD_MAP_STYLE,
             center: [-119.5, 37.5],
             zoom: isMobile ? 4.5 : 5.5,
         })
@@ -439,7 +428,7 @@ export function C2STMap() {
                                                                 {county[selectedFeature].distribution.slice(0, 15).map((d: FeatureDist) => (
                                                                     <div key={d.value} className={cn('flex items-center gap-2 text-xs', d.unique && (idx === 0 ? 'bg-blue-50' : 'bg-orange-50') + ' -mx-2 px-2 py-0.5 rounded')}>
                                                                         <span className="w-24 flex items-center gap-1.5 truncate">
-                                                                            {selectedFeature === 'clr' && (d.value === 'foo' || d.value === 'bar' ? <span className="w-3 h-3 rounded-full bg-muted" /> : <span className="w-3 h-3 rounded-full border border-border" style={{ backgroundColor: COLOR_MAP[d.value] || '#ccc' }} />)}
+                                                                            {selectedFeature === 'clr' && (d.value === 'foo' || d.value === 'bar' ? <span className="w-3 h-3 rounded-full bg-muted" /> : <span className="w-3 h-3 rounded-full border border-border" style={{ backgroundColor: PROPERTY_COLORS[d.value] || '#ccc' }} />)}
                                                                             {d.value}
                                                                         </span>
                                                                         <div className="flex-1 h-3 bg-muted rounded overflow-hidden">

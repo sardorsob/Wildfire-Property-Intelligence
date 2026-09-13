@@ -2,8 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import * as h3lib from 'h3-js'
-
-const MAP_STYLE = 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json'
+import { DASHBOARD_MAP_STYLE } from './lib/dashboardMap'
 
 const COLOR_HEX: Record<string, string> = {
   alabaster: '#9a9a90',
@@ -169,7 +168,7 @@ export function ColorMap() {
     const isMobile = window.innerWidth < 640
     map.current = new maplibregl.Map({
       container: mapContainer.current,
-      style: MAP_STYLE,
+      style: DASHBOARD_MAP_STYLE,
       center: [-119.5, 37.0],
       zoom: isMobile ? 4.5 : 5.5,
     })

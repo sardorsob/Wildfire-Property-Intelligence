@@ -3,8 +3,7 @@ import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import * as d3 from 'd3'
 import { cn } from './lib/utils'
-
-const MAP_STYLE = 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json'
+import { DASHBOARD_MAP_STYLE } from './lib/dashboardMap'
 
 interface FreqRow { fips: number; lc_type: string; bldgtype: string; freq: number }
 interface NeighborRow { county_fips: number; neighbor_fips: number }
@@ -173,7 +172,7 @@ export function MoransIMap() {
         if (!mapContainer.current || map.current) return
         try {
             const isMobile = window.innerWidth < 640
-            map.current = new maplibregl.Map({ container: mapContainer.current, style: MAP_STYLE, center: [-119.5, 37.0], zoom: isMobile ? 4.5 : 5.5 })
+            map.current = new maplibregl.Map({ container: mapContainer.current, style: DASHBOARD_MAP_STYLE, center: [-119.5, 37.0], zoom: isMobile ? 4.5 : 5.5 })
             map.current.addControl(new maplibregl.NavigationControl(), 'top-right')
             map.current.once('load', () => setIsMapReady(true))
             map.current.on('error', () => setError('Map initialization error'))

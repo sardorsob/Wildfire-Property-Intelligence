@@ -4,19 +4,8 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import * as d3 from 'd3'
 import { cn } from './lib/utils'
 import { chartColors } from './lib/chart-colors'
-
-const MAP_STYLE = 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json'
-
-const COLOR_MAP: Record<string, string> = {
-    amber: '#FFBF00', aqua: '#00FFFF', aquamarine: '#7FFFD4', auburn: '#922724', azure: '#F0FFFF',
-    bar: '#888888', beige: '#F5F5DC', blue: '#0000FF', brown: '#A52A2A', cocoa: '#D2691E',
-    coffee: '#6F4E37', crimson: '#DC143C', emerald: '#50C878', foo: '#888888', gold: '#FFD700',
-    gray: '#808080', green: '#008000', grey: '#808080', indigo: '#4B0082', ivory: '#FFFFF0',
-    lavender: '#E6E6FA', lemon: '#FFF700', lilac: '#C8A2C8', maroon: '#800000', navy: '#000080',
-    olive: '#808000', orange: '#FFA500', plum: '#8E4585', purple: '#800080', red: '#FF0000',
-    sage: '#9DC183', scarlet: '#FF2400', sienna: '#A0522D', tan: '#D2B48C', terracotta: '#E2725B',
-    verde: '#00A86B', yellow: '#FFFF00', alabaster: '#F2F0E6',
-}
+import { DASHBOARD_MAP_STYLE } from './lib/dashboardMap'
+import { PROPERTY_COLORS } from './lib/propertyColors'
 
 interface BaselineDistribution { lc_type: string; clr: string; baseline_prop: number }
 interface StabilizedDistribution { fips: number; lc_type: string; clr: string; count: number; exposure: number; observed_prop: number; baseline_prop: number; shrinkage_weight: number; stabilized_prop: number; movement: number; abs_movement: number; effective_n: number; exposure_bin: string }
@@ -120,7 +109,7 @@ export function EmpiricalBayesPooling() {
         if (!mapContainer.current || map.current) return
         try {
             const isMobile = window.innerWidth < 640
-            map.current = new maplibregl.Map({ container: mapContainer.current, style: MAP_STYLE, center: [-119.5, 37.0], zoom: isMobile ? 4.5 : 5.5 })
+            map.current = new maplibregl.Map({ container: mapContainer.current, style: DASHBOARD_MAP_STYLE, center: [-119.5, 37.0], zoom: isMobile ? 4.5 : 5.5 })
             map.current.addControl(new maplibregl.NavigationControl(), 'top-right')
             map.current.on('load', () => setIsMapReady(true))
             map.current.on('click', 'counties', (e) => {
@@ -261,7 +250,7 @@ export function EmpiricalBayesPooling() {
                                                     return (
                                                         <div key={dist.clr} className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm">
                                                             <span className="w-16 sm:w-24 flex items-center gap-1 sm:gap-2 truncate">
-                                                                {dist.clr === 'foo' || dist.clr === 'bar' ? <span className="w-3 h-3 sm:w-4 sm:h-4 rounded-full bg-muted shrink-0" /> : <span className="w-3 h-3 sm:w-4 sm:h-4 rounded-full border border-border shrink-0" style={{ backgroundColor: COLOR_MAP[dist.clr] || '#ccc' }} />}
+                                                                {dist.clr === 'foo' || dist.clr === 'bar' ? <span className="w-3 h-3 sm:w-4 sm:h-4 rounded-full bg-muted shrink-0" /> : <span className="w-3 h-3 sm:w-4 sm:h-4 rounded-full border border-border shrink-0" style={{ backgroundColor: PROPERTY_COLORS[dist.clr] || '#ccc' }} />}
                                                                 <span className="truncate">{dist.clr}</span>
                                                             </span>
                                                             <div className="flex-1 h-2.5 sm:h-3 bg-muted rounded overflow-hidden"><div className="h-full rounded" style={{ width: `${bw}%`, backgroundColor: mv >= 0 ? '#6b7280' : '#dc2626' }} /></div>
