@@ -4,116 +4,14 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import { cn } from './lib/utils'
 import { DASHBOARD_MAP_STYLE } from './lib/dashboardMap'
 import { PROPERTY_COLORS } from './lib/propertyColors'
-
-const COLOR_GROUPS_MAP: Record<string, string> = {
-    azure: 'red', blue: 'red', crimson: 'red', foo: 'red', indigo: 'red', purple: 'red', red: 'red', scarlet: 'red',
-    aqua: 'navy', aquamarine: 'navy', lavender: 'navy', lilac: 'navy', navy: 'navy',
-    alabaster: 'alabaster', gray: 'alabaster', grey: 'alabaster', ivory: 'alabaster',
-    amber: 'amber', gold: 'amber', lemon: 'amber', yellow: 'amber',
-    beige: 'cocoa', brown: 'cocoa', cocoa: 'cocoa', coffee: 'cocoa',
-    green: 'olive', olive: 'olive', sage: 'olive', verde: 'olive',
-    orange: 'orange', sienna: 'orange', terracotta: 'orange',
-}
-
-const GROUP_NAMES = new Set(Object.values(COLOR_GROUPS_MAP))
-const fmtLabel = (v: string) => GROUP_NAMES.has(v) ? v.replace('_', ' / ') : v
-
-function poolDistributions(distA: FeatureDist[], distB: FeatureDist[]): [FeatureDist[], FeatureDist[]] {
-    const merge = (dist: FeatureDist[]) => {
-        const acc: Record<string, { count: number; proportion: number }> = {}
-        for (const d of dist) {
-            const key = COLOR_GROUPS_MAP[d.value] ?? d.value
-            if (!acc[key]) acc[key] = { count: 0, proportion: 0 }
-            acc[key].count += d.count
-            acc[key].proportion += d.proportion
-        }
-        return acc
-    }
-    const mA = merge(distA)
-    const mB = merge(distB)
-    const toList = (m: typeof mA, other: typeof mA): FeatureDist[] =>
-        Object.entries(m)
-            .filter(([, v]) => v.count > 0)
-            .map(([key, v]) => ({
-                value: key,
-                count: v.count,
-                proportion: v.proportion,
-                unique: (other[key]?.count ?? 0) === 0,
-            }))
-            .sort((a, b) => b.count - a.count)
-    return [toList(mA, mB), toList(mB, mA)]
-}
-
-interface DivergenceData {
-    counties: GeoJSON.FeatureCollection
-    edges: GeoJSON.FeatureCollection
-    stats: {
-        total_pairs: number
-        total_counties: number
-        mean_jsd: number
-        max_jsd: number
-        min_jsd: number
-    }
-}
-
-interface SelectedPair {
-    fips_a: string
-    fips_b: string
-    county_a: string
-    county_b: string
-}
-
-interface FeatureDist {
-    value: string
-    count: number
-    proportion: number
-    unique: boolean
-    is_group?: boolean
-}
-
-interface FeatureData {
-    distribution: FeatureDist[]
-    vocab_size: number
-}
-
-interface AppliedCondition {
-    column: string
-    value: string
-}
-
-interface JsdData {
-    original: number
-    merged?: number
-    reduction?: number
-    reduction_pct?: number
-}
-
-interface ComparisonResult {
-    county_a: {
-        fips: string
-        name: string
-        total_count: number
-        clr: FeatureData
-        clr_merged?: FeatureData
-        bldgtype: FeatureData
-        st_damcat: FeatureData
-    }
-    county_b: {
-        fips: string
-        name: string
-        total_count: number
-        clr: FeatureData
-        clr_merged?: FeatureData
-        bldgtype: FeatureData
-        st_damcat: FeatureData
-    }
-    conditioning: {
-        conditions: AppliedCondition[]
-        total_conditions: number
-    }
-    jsd?: JsdData
-    error?: string
-}
+import { ComparisonPanel } from './neighbor-divergence/ComparisonPanel'
+import {
+    COLOR_GROUP_NAMES,
+    deriveComparisonSummary,
+    type ComparisonResult,
+    type DivergenceData,
+    type SelectedPair,
+} from './neighbor-divergence/model'
 
 export function NeighborDivergence() {
     const mapContainer = useRef<HTMLDivElement>(null)
@@ -132,7 +30,7 @@ export function NeighborDivergence() {
     const [selectedPair, setSelectedPair] = useState<SelectedPair | null>(null)
 
     // Comparison state
-    const [pairComparisons, setPairComparisons] = useState<Record<string, any>>({})
+    const [pairComparisons, setPairComparisons] = useState<Record<string, Omit<ComparisonResult, 'conditioning'>>>({})
     const [comparisonResult, setComparisonResult] = useState<ComparisonResult | null>(null)
 
     const [usePooled, setUsePooled] = useState(false)
@@ -550,34 +448,10 @@ export function NeighborDivergence() {
             .finally(() => setMergedMapLoading(false))
     }, [usePooled])
 
-    const [displayClrA, displayClrB] = useMemo(() => {
-        if (!comparisonResult || comparisonResult.error) return [null, null]
-        if (!usePooled) return [comparisonResult.county_a.clr, comparisonResult.county_b.clr]
-        const [pA, pB] = poolDistributions(
-            comparisonResult.county_a.clr.distribution,
-            comparisonResult.county_b.clr.distribution
-        )
-        return [
-            { distribution: pA, vocab_size: pA.length },
-            { distribution: pB, vocab_size: pB.length },
-        ]
-    }, [comparisonResult, usePooled])
-
-    const maxProportion = displayClrA && displayClrB
-        ? Math.max(
-            ...displayClrA.distribution.map((d: FeatureDist) => d.proportion),
-            ...displayClrB.distribution.map((d: FeatureDist) => d.proportion)
-        )
-        : 0
-
-    const uniqueToA = displayClrA ? displayClrA.distribution.filter((d: FeatureDist) => d.unique).map((d: FeatureDist) => d.value) : []
-    const uniqueToB = displayClrB ? displayClrB.distribution.filter((d: FeatureDist) => d.unique).map((d: FeatureDist) => d.value) : []
-    const sharedColors = displayClrA
-        ? displayClrA.distribution.filter((d: FeatureDist) => !d.unique && d.count > 0).map((d: FeatureDist) => d.value)
-        : []
-    const vocabOverlap = displayClrA && displayClrB && (displayClrA.vocab_size + displayClrB.vocab_size - sharedColors.length) > 0
-        ? sharedColors.length / (displayClrA.vocab_size + displayClrB.vocab_size - sharedColors.length)
-        : 0
+    const comparisonSummary = useMemo(
+        () => deriveComparisonSummary(comparisonResult, usePooled),
+        [comparisonResult, usePooled]
+    )
 
     return (
         <div className={cn(
@@ -834,191 +708,18 @@ export function NeighborDivergence() {
 
             {/* Comparison Panel - Bottom Sheet */}
             {selectedPair && (
-                <div
-                    ref={comparisonRef}
-                    className={cn(
-                        'absolute bottom-0 left-0 right-0 bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.15)] z-40 transition-all duration-300',
-                        showComparisonPanel ? 'h-[85%] sm:h-[65%]' : 'h-auto'
-                    )}
-                >
-                    {/* Panel Header - Always visible */}
-                    <div
-                        className="px-3 sm:px-5 py-3 sm:py-4 border-b border-border flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors"
-                        onClick={() => setShowComparisonPanel(!showComparisonPanel)}
-                    >
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-6 min-w-0">
-                            <h3 className="font-semibold text-sm sm:text-base truncate">
-                                {selectedPair.county_a} vs {selectedPair.county_b}
-                            </h3>
-                            {comparisonResult?.jsd && (
-                                <div className="flex items-center gap-1.5 sm:gap-3 text-xs sm:text-sm flex-wrap">
-                                    <span className="px-2 sm:px-3 py-0.5 sm:py-1 bg-muted rounded font-medium">JSD: {comparisonResult.jsd.original.toFixed(4)}</span>
-                                    {comparisonResult.jsd.merged !== undefined && (
-                                        <>
-                                            <span className="text-muted-foreground">→</span>
-                                            <span className="px-2 sm:px-3 py-0.5 sm:py-1 bg-blue-50 rounded font-medium">{comparisonResult.jsd.merged.toFixed(4)}</span>
-                                            <span className={cn(
-                                                'px-2 sm:px-3 py-0.5 sm:py-1 rounded font-semibold',
-                                                comparisonResult.jsd.reduction! > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                                            )}>
-                                                {comparisonResult.jsd.reduction! > 0 ? '-' : '+'}
-                                                {Math.abs(comparisonResult.jsd.reduction_pct!).toFixed(1)}%
-                                            </span>
-                                        </>
-                                    )}
-                                    <span className="hidden sm:inline text-muted-foreground">|</span>
-                                    <span className="hidden sm:inline text-muted-foreground">
-                                        Overlap: {(vocabOverlap * 100).toFixed(0)}% ({sharedColors.length} colors)
-                                    </span>
-                                </div>
-                            )}
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <button
-                                className="px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
-                                onClick={(e) => { e.stopPropagation(); setShowComparisonPanel(!showComparisonPanel) }}
-                            >
-                                {showComparisonPanel ? 'Collapse' : 'Expand'}
-                            </button>
-                            <button
-                                className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded text-xl leading-none"
-                                onClick={(e) => { e.stopPropagation(); setSelectedPair(null); setShowComparisonPanel(false) }}
-                            >
-                                ×
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Panel Content - Expandable */}
-                    {showComparisonPanel && (
-                        <div className="h-[calc(100%-55px)] sm:h-[calc(100%-65px)] overflow-y-auto p-3 sm:p-6">
-                                {comparisonResult && !comparisonResult.error && (
-                                <div className="space-y-4 sm:space-y-6">
-                                    {(comparisonResult.county_a.total_count < 100 || comparisonResult.county_b.total_count < 100) && (
-                                        <div className="px-3 sm:px-4 py-2 sm:py-3 bg-amber-50 border border-amber-200 rounded text-amber-800 text-xs sm:text-sm">
-                                            Warning: Small sample size. {comparisonResult.county_a.name} has {comparisonResult.county_a.total_count} records, {comparisonResult.county_b.name} has {comparisonResult.county_b.total_count} records.
-                                        </div>
-                                    )}
-
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                                        <div className="border border-border rounded-lg p-3 sm:p-4">
-                                            <h3 className="font-semibold text-sm sm:text-base mb-1">{comparisonResult.county_a.name}</h3>
-                                            <div className="text-xs text-muted-foreground mb-3">
-                                                {comparisonResult.county_a.total_count.toLocaleString()} records | {displayClrA?.vocab_size} {usePooled ? 'groups' : 'colors'}
-                                            </div>
-                                            <div className="space-y-1.5">
-                                                {displayClrA?.distribution.slice(0, 15).map((d: FeatureDist) => (
-                                                    <div key={d.value} className={cn('flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm', d.unique && 'bg-blue-50 -mx-2 px-2 py-1 rounded')}>
-                                                        <span className="w-20 sm:w-28 flex items-center gap-1 sm:gap-2 truncate">
-                                                            {d.value === 'foo' || d.value === 'bar' ? (
-                                                                <span className="w-3 h-3 sm:w-4 sm:h-4 rounded-full bg-muted flex items-center justify-center text-[8px] font-bold text-muted-foreground shrink-0">?</span>
-                                                            ) : GROUP_NAMES.has(d.value) ? (
-                                                                <span className="w-3 h-3 sm:w-4 sm:h-4 rounded-sm shrink-0" style={{ backgroundColor: PROPERTY_COLORS[d.value] ?? '#ccc' }} />
-                                                            ) : (
-                                                                <span className="w-3 h-3 sm:w-4 sm:h-4 rounded-full border border-border shrink-0" style={{ backgroundColor: PROPERTY_COLORS[d.value] || '#ccc' }} />
-                                                            )}
-                                                            {GROUP_NAMES.has(d.value)
-                                                                ? <span className="px-1 py-0.5 rounded text-[10px] sm:text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-200">{fmtLabel(d.value)}</span>
-                                                                : <span className="text-xs sm:text-sm truncate">{fmtLabel(d.value)}</span>
-                                                            }
-                                                        </span>
-                                                        <div className="flex-1 h-2.5 sm:h-3 bg-muted rounded overflow-hidden">
-                                                            <div
-                                                                className="h-full rounded"
-                                                                style={{
-                                                                    width: `${(d.proportion / maxProportion) * 100}%`,
-                                                                    backgroundColor: d.unique ? '#0077BB' : '#6b7280'
-                                                                }}
-                                                            />
-                                                        </div>
-                                                        <span className="w-12 sm:w-14 text-right text-muted-foreground">{(d.proportion * 100).toFixed(1)}%</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        <div className="border border-border rounded-lg p-3 sm:p-4">
-                                            <h3 className="font-semibold text-sm sm:text-base mb-1">{comparisonResult.county_b.name}</h3>
-                                            <div className="text-xs text-muted-foreground mb-3">
-                                                {comparisonResult.county_b.total_count.toLocaleString()} records | {displayClrB?.vocab_size} {usePooled ? 'groups' : 'colors'}
-                                            </div>
-                                            <div className="space-y-1.5">
-                                                {displayClrB?.distribution.slice(0, 15).map((d: FeatureDist) => (
-                                                    <div key={d.value} className={cn('flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm', d.unique && 'bg-orange-50 -mx-2 px-2 py-1 rounded')}>
-                                                        <span className="w-20 sm:w-28 flex items-center gap-1 sm:gap-2 truncate">
-                                                            {d.value === 'foo' || d.value === 'bar' ? (
-                                                                <span className="w-3 h-3 sm:w-4 sm:h-4 rounded-full bg-muted flex items-center justify-center text-[8px] font-bold text-muted-foreground shrink-0">?</span>
-                                                            ) : GROUP_NAMES.has(d.value) ? (
-                                                                <span className="w-3 h-3 sm:w-4 sm:h-4 rounded-sm shrink-0" style={{ backgroundColor: PROPERTY_COLORS[d.value] ?? '#ccc' }} />
-                                                            ) : (
-                                                                <span className="w-3 h-3 sm:w-4 sm:h-4 rounded-full border border-border shrink-0" style={{ backgroundColor: PROPERTY_COLORS[d.value] || '#ccc' }} />
-                                                            )}
-                                                            {GROUP_NAMES.has(d.value)
-                                                                ? <span className="px-1 py-0.5 rounded text-[10px] sm:text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-200">{fmtLabel(d.value)}</span>
-                                                                : <span className="text-xs sm:text-sm truncate">{fmtLabel(d.value)}</span>
-                                                            }
-                                                        </span>
-                                                        <div className="flex-1 h-2.5 sm:h-3 bg-muted rounded overflow-hidden">
-                                                            <div
-                                                                className="h-full rounded"
-                                                                style={{
-                                                                    width: `${(d.proportion / maxProportion) * 100}%`,
-                                                                    backgroundColor: d.unique ? '#EE7733' : '#6b7280'
-                                                                }}
-                                                            />
-                                                        </div>
-                                                        <span className="w-12 sm:w-14 text-right text-muted-foreground">{(d.proportion * 100).toFixed(1)}%</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-                                        <div className="border border-border rounded-lg p-3 sm:p-4">
-                                            <h4 className="text-xs sm:text-sm font-semibold mb-2">Unique to {comparisonResult.county_a.name} ({uniqueToA.length})</h4>
-                                            <div className="flex flex-wrap gap-1.5">
-                                                {uniqueToA.length > 0
-                                                    ? uniqueToA.map((c: string) => (
-                                                        <span key={c} className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">{c}</span>
-                                                    ))
-                                                    : <span className="text-sm text-muted-foreground">None</span>
-                                                }
-                                            </div>
-                                        </div>
-
-                                        <div className="border border-border rounded-lg p-3 sm:p-4">
-                                            <h4 className="text-xs sm:text-sm font-semibold mb-2">Unique to {comparisonResult.county_b.name} ({uniqueToB.length})</h4>
-                                            <div className="flex flex-wrap gap-1.5">
-                                                {uniqueToB.length > 0
-                                                    ? uniqueToB.map((c: string) => (
-                                                        <span key={c} className="px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded">{c}</span>
-                                                    ))
-                                                    : <span className="text-sm text-muted-foreground">None</span>
-                                                }
-                                            </div>
-                                        </div>
-
-                                        <div className="border border-border rounded-lg p-3 sm:p-4">
-                                            <h4 className="text-xs sm:text-sm font-semibold mb-2">Shared {usePooled ? 'Groups' : 'Colors'} ({sharedColors.length})</h4>
-                                            <div className="flex flex-wrap gap-1.5">
-                                                {sharedColors.map((c: string) => (
-                                                    <span key={c} className="px-2 py-1 text-xs bg-muted text-foreground rounded">{c}</span>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {comparisonResult?.error && (
-                                <div className="px-4 py-3 bg-red-50 border border-red-200 rounded text-red-800 text-sm">
-                                    {comparisonResult.error}
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
+                <ComparisonPanel
+                    comparisonRef={comparisonRef}
+                    selectedPair={selectedPair}
+                    comparisonResult={comparisonResult}
+                    summary={comparisonSummary}
+                    usePooled={usePooled}
+                    expanded={showComparisonPanel}
+                    propertyColors={PROPERTY_COLORS}
+                    colorGroupNames={COLOR_GROUP_NAMES}
+                    onToggle={() => setShowComparisonPanel(!showComparisonPanel)}
+                    onClose={() => { setSelectedPair(null); setShowComparisonPanel(false) }}
+                />
             )}
         </div>
     )
