@@ -327,7 +327,7 @@ export function ConditionalProbability() {
                                             <p className="sm:inline">L1: {lc.l1_distance.toFixed(4)}</p>
                                         </div>
                                         <div className="mb-6">
-                                            <h4 className="mb-3 text-base font-semibold text-foreground">Color Distribution ({selectedMetric === 'kl_div' ? 'KL Contribution' : 'L1 Difference'})</h4>
+                                            <h4 className="mb-3 text-base font-semibold text-foreground">Color Distribution ({selectedMetric === 'kl_div' ? 'KL Contribution' : 'Absolute Probability Difference'})</h4>
                                             <div className="space-y-1.5 border border-border rounded-lg p-3 bg-muted/30">
                                                 {sortedDistributions.map((dist) => {
                                                     const maxContrib = Math.max(...sortedDistributions.map(d => Math.abs(distributionValue(d))))
@@ -357,7 +357,7 @@ export function ConditionalProbability() {
                                             <DeviationChart distributions={lc.distributions} />
                                         </div>
                                         <div className="mb-6">
-                                            <h4 className="mb-3 text-base font-semibold text-foreground">{selectedMetric === 'kl_div' ? 'Top Contributing Colors' : 'Largest L1 Differences'}</h4>
+                                            <h4 className="mb-3 text-base font-semibold text-foreground">{selectedMetric === 'kl_div' ? 'Top Contributing Colors' : 'Largest Absolute Category Differences'}</h4>
                                             <TopContributorsChart distributions={lc.distributions} metric={selectedMetric} />
                                         </div>
                                         <div className="mt-4">
@@ -460,7 +460,7 @@ function TopContributorsChart({ distributions, metric }: { distributions: ColorD
                             <div className="flex items-center gap-1.5 sm:gap-2">
                                 {dist.clr === 'foo' || dist.clr === 'bar' ? <span className="w-3 h-3 sm:w-4 sm:h-4 rounded-full bg-muted shrink-0" /> : <span className="w-3 h-3 sm:w-4 sm:h-4 rounded-full border border-border shrink-0" style={{ backgroundColor: PROPERTY_COLORS[dist.clr] || '#ccc' }} />}
                                 <span className="font-medium">{dist.clr}</span>
-                                <span className="text-[10px] sm:text-xs text-muted-foreground">({metric === 'kl_div' ? 'KL' : 'L1'}: {value(dist).toFixed(4)})</span>
+                                <span className="text-[10px] sm:text-xs text-muted-foreground">({metric === 'kl_div' ? 'KL' : 'Absolute difference'}: {value(dist).toFixed(4)})</span>
                             </div>
                         </div>
                         <div className="space-y-1.5">

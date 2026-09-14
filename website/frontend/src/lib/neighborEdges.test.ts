@@ -22,6 +22,10 @@ test('selectNeighborEdges keeps only edges touching the selected county', () => 
     assert.deepEqual(selectNeighborEdges(edges, '06001').features, [edges.features[0]])
 })
 
+test('selectNeighborEdges keeps edges when the selected county is fips_b', () => {
+    assert.deepEqual(selectNeighborEdges(edges, '06013').features, [edges.features[0]])
+})
+
 test('selectNeighborEdges returns an empty collection without a selection', () => {
     assert.deepEqual(selectNeighborEdges(edges, null), { type: 'FeatureCollection', features: [] })
 })
