@@ -122,7 +122,7 @@ export function ConditionalProbability() {
         const detail = buildCountyDetail(fipsNum, summary, detailRows, geoFeatures, lc)
         setSelectedCountyFips(fipsStr)
         setCountyDetail(detail)
-        setShowDetailPanel(true)
+        setShowDetailPanel(window.innerWidth >= 640)
     }, [])
 
     const clearCountySelection = useCallback(() => {

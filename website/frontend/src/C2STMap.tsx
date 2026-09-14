@@ -270,6 +270,7 @@ export function C2STMap() {
                 const props = e.features[0].properties
                 setSelectedLcType(null)
                 setSelectedPair({ fips_a: props.fips_a, fips_b: props.fips_b, county_a: props.county_a, county_b: props.county_b })
+                setShowComparisonPanel(window.innerWidth >= 640)
                 map.current!.setFilter('selected-edge', ['all', ['==', ['get', 'fips_a'], props.fips_a], ['==', ['get', 'fips_b'], props.fips_b]])
                 setTimeout(() => comparisonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
             })

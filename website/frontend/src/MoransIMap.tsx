@@ -175,7 +175,7 @@ export function MoransIMap() {
         const { frequencies, neighbors, geoFeatures } = sourceDataRef.current
         const detail = buildCountyDetail(fipsNum, frequencies, neighbors, geoFeatures, selectedLcRef.current, selectedBldgRef.current)
         setCountyDetail(detail)
-        setShowDetailPanel(true)
+        setShowDetailPanel(window.innerWidth >= 640)
     }, [])
 
     useEffect(() => {
@@ -272,7 +272,7 @@ export function MoransIMap() {
                         <div className="font-semibold mb-1 sm:mb-2 text-foreground text-[10px] sm:text-xs">Local Moran's I</div>
                         <div className="w-28 sm:w-44 h-2 sm:h-2.5 rounded-sm" style={{ background: `linear-gradient(to right, ${d3.interpolateRdBu(0)}, ${d3.interpolateRdBu(0.5)}, ${d3.interpolateRdBu(1)})` }} />
                         <div className="flex justify-between mt-1 text-[9px] sm:text-[10px] text-muted-foreground"><span>{legendRange.min.toFixed(4)}</span><span>{legendRange.max.toFixed(4)}</span></div>
-                        <div className="flex justify-between mt-1 text-[9px] sm:text-[10px] text-muted-foreground"><span>Clustering</span><span>Dispersion</span></div>
+                        <div className="flex justify-between mt-1 text-[9px] sm:text-[10px] text-muted-foreground"><span>Dispersion</span><span>Clustering</span></div>
                     </div>
                 )}
             </div>

@@ -276,7 +276,7 @@ export function HomePage({ onPageChange }: { onPageChange?: (page: Page) => void
                         <div className="pl-4 sm:pl-6 border-l-2 border-muted space-y-2 mt-4">
                             <MethodLink title="Kullback Leibler Divergence" page="conditional-probability" onPageChange={onPageChange} />
                             <P>
-                                To quantify how much a county&apos;s color distribution deviates from the neighbor-pooled regional norm, we compute Kullback Leibler divergence. KL measures the information loss when approximating the county distribution with the pooled distribution. Each color contributes to the total KL; positive differences (county uses a color more than the pool) and negative differences (county uses it less) both show up in the per-color bar chart. This reveals which colors are over- or under-represented locally.
+                                To quantify how much a county&apos;s color distribution deviates from the neighbor-pooled regional norm, we compute Kullback Leibler divergence. KL measures the information loss when approximating the county distribution with the pooled distribution. Each color contributes to the total KL; positive differences (county uses a color more than the pool) and negative differences (county uses it less) both show up in the per-color bar chart. This reveals which colors are over- or under-represented locally. The method view offers KL divergence and L1 distance. [<a href="#ref-wang2016" className="underline">9</a>]
                             </P>
                             <Dropdown title="See the math">
                                 <div className="space-y-2">
@@ -289,22 +289,6 @@ export function HomePage({ onPageChange }: { onPageChange?: (page: Page) => void
                                 </div>
                             </Dropdown>
                         </div>
-                    </div>
-                    <div className="space-y-2">
-                        <h3 className="text-base font-semibold">Kullback Leibler Divergence</h3>
-                        <P>
-                            To quantify how county-level color distributions differ from regional patterns, we compute the Kullback Leibler divergence between two probability distributions. In this context, the county-level conditional probability distribution over colors is compared to the corresponding pooled distribution derived from neighboring counties. Higher KL values indicate larger deviations between the two distributions, suggesting that a county's color usage differs from the regional pattern. In contrast, values close to zero indicate that the county distribution closely matches the neighboring distribution. [<a href="#ref-wang2016" className="underline">9</a>]
-                        </P>
-                        <Dropdown title="See the math">
-                            <div className="space-y-2">
-                                <div className="overflow-x-auto">
-                                    <BlockMath>{String.raw`\mathrm{KL}(P \parallel Q) = \sum_{k} P_k \log\left(\frac{P_k}{Q_k}\right)`}</BlockMath>
-                                </div>
-                                <p className="text-muted-foreground">
-                                    <InlineMath>P_k</InlineMath> is the county-level probability of color <InlineMath>k</InlineMath>, and <InlineMath>Q_k</InlineMath> is the pooled neighbor probability for that same context.
-                                </p>
-                            </div>
-                        </Dropdown>
                     </div>
                     <div className="space-y-2">
                         <MethodLink title="Jensen Shannon Neighbor Divergence" page="neighbor-divergence" onPageChange={onPageChange} />

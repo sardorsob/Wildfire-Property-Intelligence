@@ -38,7 +38,7 @@ export function ComparisonPanel({
         <div
             ref={comparisonRef}
             className={cn(
-                'absolute bottom-0 left-0 right-0 bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.15)] z-40 transition-all duration-300',
+                'absolute bottom-0 left-0 right-0 bg-card shadow-[0_-4px_20px_rgba(0,0,0,0.15)] z-40 transition-all duration-300',
                 expanded ? 'h-[85%] sm:h-[65%]' : 'h-auto'
             )}
         >

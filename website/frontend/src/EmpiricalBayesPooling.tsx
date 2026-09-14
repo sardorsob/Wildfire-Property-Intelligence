@@ -100,7 +100,7 @@ export function EmpiricalBayesPooling() {
         const { stabilized, baseline, geoFeatures } = sourceDataRef.current
         const detail = buildCountyDetail(fipsNum, stabilized, baseline, geoFeatures, lc)
         setCountyDetail(detail)
-        setShowDetailPanel(true)
+        setShowDetailPanel(window.innerWidth >= 640)
     }, [])
 
     const landcoverTypes = useMemo(

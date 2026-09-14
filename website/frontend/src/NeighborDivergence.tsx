@@ -289,7 +289,7 @@ export function NeighborDivergence() {
                 county_b: props.county_b
             }
             setSelectedPair(pair)
-            setShowComparisonPanel(true)
+            setShowComparisonPanel(window.innerWidth >= 640)
 
             if (isOriginal) {
                 mapInstance.setFilter('selected-edge', [
@@ -597,7 +597,7 @@ export function NeighborDivergence() {
                     {/* Stats badge when split view */}
                     {showMergedMap && data && (
                         <div className={cn(
-                            "absolute left-1/2 -translate-x-1/2 z-10 bg-white rounded-lg shadow-elevated px-2 sm:px-4 py-2 sm:py-3 text-center",
+                            "absolute left-1/2 -translate-x-1/2 z-10 bg-card rounded-lg shadow-elevated px-2 sm:px-4 py-2 sm:py-3 text-center",
                             selectedPair ? 'bottom-20' : 'bottom-4'
                         )}>
                             <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Original</div>
@@ -636,15 +636,15 @@ export function NeighborDivergence() {
                             selectedPair ? 'bottom-20' : 'bottom-2.5'
                         )}>
                             {isFullscreen && (
-                                <span className="bg-white/90 px-2.5 py-1.5 rounded text-xs text-muted-foreground">
+                                <span className="bg-card/95 px-2.5 py-1.5 rounded text-xs text-muted-foreground">
                                     Press <kbd className="bg-sage-100 border border-sage-300 rounded px-1.5 py-0.5 font-semibold text-foreground">Esc</kbd> to exit fullscreen
                                 </span>
                             )}
-                            <span className="bg-white/90 px-2.5 py-1.5 rounded text-xs text-muted-foreground">
+                            <span className="bg-card/95 px-2.5 py-1.5 rounded text-xs text-muted-foreground">
                                 Press <kbd className="bg-sage-100 border border-sage-300 rounded px-1.5 py-0.5 font-semibold text-foreground">E</kbd> to {showEdges ? 'hide' : 'show'} edges
                             </span>
                             {!selectedPair && (
-                                <span className="bg-white/90 px-2.5 py-1.5 rounded text-xs text-muted-foreground">
+                                <span className="bg-card/95 px-2.5 py-1.5 rounded text-xs text-muted-foreground">
                                     Click edge to compare counties
                                 </span>
                             )}
@@ -672,7 +672,7 @@ export function NeighborDivergence() {
                         {/* Stats badge */}
                         {mergedData && data && (
                             <div className={cn(
-                                "absolute left-1/2 -translate-x-1/2 z-10 bg-white rounded-lg shadow-elevated px-2 sm:px-4 py-2 sm:py-3 text-center",
+                                "absolute left-1/2 -translate-x-1/2 z-10 bg-card rounded-lg shadow-elevated px-2 sm:px-4 py-2 sm:py-3 text-center",
                                 selectedPair ? 'bottom-20' : 'bottom-4'
                             )}>
                                 <div className="text-[10px] font-semibold text-blue-600 uppercase tracking-wide mb-1">Merged</div>
