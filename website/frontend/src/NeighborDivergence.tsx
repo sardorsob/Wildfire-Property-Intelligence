@@ -637,11 +637,11 @@ export function NeighborDivergence() {
                         )}>
                             {isFullscreen && (
                                 <span className="bg-card/95 px-2.5 py-1.5 rounded text-xs text-muted-foreground">
-                                    Press <kbd className="bg-sage-100 border border-sage-300 rounded px-1.5 py-0.5 font-semibold text-foreground">Esc</kbd> to exit fullscreen
+                                    Press <kbd className="bg-muted border border-border rounded px-1.5 py-0.5 font-semibold text-foreground">Esc</kbd> to exit fullscreen
                                 </span>
                             )}
                             <span className="bg-card/95 px-2.5 py-1.5 rounded text-xs text-muted-foreground">
-                                Press <kbd className="bg-sage-100 border border-sage-300 rounded px-1.5 py-0.5 font-semibold text-foreground">E</kbd> to {showEdges ? 'hide' : 'show'} edges
+                                Press <kbd className="bg-muted border border-border rounded px-1.5 py-0.5 font-semibold text-foreground">E</kbd> to {showEdges ? 'hide' : 'show'} edges
                             </span>
                             {!selectedPair && (
                                 <span className="bg-card/95 px-2.5 py-1.5 rounded text-xs text-muted-foreground">

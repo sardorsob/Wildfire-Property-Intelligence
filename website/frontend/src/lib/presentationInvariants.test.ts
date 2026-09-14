@@ -18,3 +18,10 @@ test('Neighbor comparison sheet uses the card theme surface', () => {
     assert.match(source, /bottom-0 left-0 right-0 bg-card/)
     assert.doesNotMatch(source, /bottom-0 left-0 right-0 bg-white/)
 })
+
+test('Neighbor keycap surfaces use semantic theme tokens', () => {
+    const source = readSource('NeighborDivergence.tsx')
+
+    assert.match(source, /<kbd className="bg-muted border border-border rounded px-1\.5 py-0\.5 font-semibold text-foreground">/)
+    assert.doesNotMatch(source, /<kbd className="bg-sage-100 border border-sage-300/)
+})
