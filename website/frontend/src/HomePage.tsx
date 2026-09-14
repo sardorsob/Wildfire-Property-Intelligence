@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import 'katex/dist/katex.min.css'
 import { BlockMath, InlineMath } from 'react-katex'
 import { FileText, Github, Presentation } from 'lucide-react'
-import { pagePath, type Page } from './lib/dashboardNavigation'
+import { pagePath, shouldHandleDashboardClick, type Page } from './lib/dashboardNavigation'
 import { PdfViewerModal } from './components/PdfViewerModal'
 import { getPdfTargetFromHash, type PdfModalTarget } from './components/pdfHash'
 
@@ -121,9 +121,9 @@ function MethodLink({ title, page, onPageChange }: {
         <h3 className="text-base font-semibold">
             <a
                 href={pagePath(page)}
-                className="hover:underline"
+                className="text-[var(--button-accent)] hover:text-[var(--button-accent)] hover:underline"
                 onClick={(event) => {
-                    if (onPageChange) {
+                    if (onPageChange && shouldHandleDashboardClick(event)) {
                         event.preventDefault()
                         onPageChange(page)
                     }

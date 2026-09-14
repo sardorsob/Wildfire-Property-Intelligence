@@ -675,7 +675,7 @@ export function NeighborDivergence() {
                                 "absolute left-1/2 -translate-x-1/2 z-10 bg-card rounded-lg shadow-elevated px-2 sm:px-4 py-2 sm:py-3 text-center",
                                 selectedPair ? 'bottom-20' : 'bottom-4'
                             )}>
-                                <div className="text-[10px] font-semibold text-blue-600 uppercase tracking-wide mb-1">Merged</div>
+                                <div className="text-[10px] font-semibold text-foreground uppercase tracking-wide mb-1">Merged</div>
                                 <div className="text-lg font-bold text-foreground">{mergedData.stats.mean_jsd.toFixed(3)}</div>
                                 <div className="text-[10px] text-muted-foreground">Mean JSD</div>
                             </div>

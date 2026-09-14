@@ -1,5 +1,5 @@
 import type { Icon } from "@tabler/icons-react"
-import type { Page } from "@/lib/dashboardNavigation"
+import { shouldHandleDashboardClick, type Page } from "@/lib/dashboardNavigation"
 
 import {
   SidebarGroup,
@@ -48,6 +48,7 @@ export function NavMain({ items, currentPage, onPageChange }: NavMainProps) {
                   <SidebarMenuItem key={page}>
                     <SidebarMenuButton asChild tooltip={item.title} isActive={currentPage === page} className="[&_span]:text-[var(--button-accent)] [&_svg]:text-[var(--button-accent)] data-[active=true]:[&_span]:text-[var(--button-accent)] data-[active=true]:[&_svg]:text-[var(--button-accent)] hover:[&_span]:text-[var(--button-accent)] hover:[&_svg]:text-[var(--button-accent)]">
                       <a href={item.href} onClick={(event) => {
+                        if (!shouldHandleDashboardClick(event)) return
                         event.preventDefault()
                         onPageChange(page)
                         setOpenMobile(false)
