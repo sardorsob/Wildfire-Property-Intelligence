@@ -7,12 +7,16 @@ import { chartColors } from './lib/chart-colors'
 import { DASHBOARD_MAP_STYLE } from './lib/dashboardMap'
 import { PROPERTY_COLORS } from './lib/propertyColors'
 import { buildCountyDetail, type ColorDistribution, type CountyDetail, type DetailRow, type SummaryRow } from './lib/conditionalPooling'
+import { selectNeighborEdges } from './lib/neighborEdges'
 
 interface CountyMapProperties { fips: string; county_name: string; mean_value: number; max_value: number; total_exposure: number; num_neighbors: number }
 interface CountyMapData { type: 'FeatureCollection'; features: GeoJSON.Feature<GeoJSON.Geometry, CountyMapProperties>[]; metric: string; lc_type: string | null; stats: { total_counties: number; mean_value: number; max_value: number } }
-interface ConditionalSourceData { summary: SummaryRow[]; detail: DetailRow[]; geoFeatures: GeoJSON.Feature[] }
+interface ConditionalSourceData { summary: SummaryRow[]; detail: DetailRow[]; geoFeatures: GeoJSON.Feature[]; neighborEdges: GeoJSON.FeatureCollection }
+type Metric = 'kl_div' | 'l1_distance'
 
-function buildMapData(summaryRows: SummaryRow[], geoFeatures: GeoJSON.Feature[], lc: string, metric: string): CountyMapData {
+const EMPTY_NEIGHBOR_EDGES: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
+
+function buildMapData(summaryRows: SummaryRow[], geoFeatures: GeoJSON.Feature[], lc: string, metric: Metric): CountyMapData {
     const filtered = lc ? summaryRows.filter(r => r.lc_type === lc) : summaryRows
     const metricKey = metric === 'kl_div' ? 'kl_div' : 'l1_distance'
 
@@ -76,9 +80,10 @@ export function ConditionalProbability() {
 
     const [sourceData, setSourceData] = useState<ConditionalSourceData | null>(null)
     const [selectedLandcover, setSelectedLandcover] = useState<string>('')
-    const [selectedMetric, setSelectedMetric] = useState<string>('kl_div')
+    const [selectedMetric, setSelectedMetric] = useState<Metric>('kl_div')
     const [mapData, setMapData] = useState<CountyMapData | null>(null)
     const [countyDetail, setCountyDetail] = useState<CountyDetail | null>(null)
+    const [selectedCountyFips, setSelectedCountyFips] = useState<string | null>(null)
     const detailRef = useRef<HTMLDivElement>(null)
     const [showDetailPanel, setShowDetailPanel] = useState(false)
     const [loading, setLoading] = useState(true)
@@ -95,9 +100,10 @@ export function ConditionalProbability() {
             fetch('/data/conditional-pooling-summary.json').then(r => r.json()),
             fetch('/data/conditional-pooling-detail.json').then(r => r.json()),
             fetch('/data/group-divergence.json').then(r => r.json()),
+            fetch('/data/neighbor-divergence-map.json').then(r => r.json()),
         ])
-            .then(([summary, detail, gd]) => {
-                const loaded = { summary, detail, geoFeatures: gd.map.features }
+            .then(([summary, detail, gd, neighborMap]) => {
+                const loaded = { summary, detail, geoFeatures: gd.map.features, neighborEdges: neighborMap.edges }
                 sourceDataRef.current = loaded
                 setSourceData(loaded)
                 setLoading(false)
@@ -114,8 +120,15 @@ export function ConditionalProbability() {
         const lc = selectedLandcoverRef.current
         const { summary, detail: detailRows, geoFeatures } = sourceDataRef.current
         const detail = buildCountyDetail(fipsNum, summary, detailRows, geoFeatures, lc)
+        setSelectedCountyFips(fipsStr)
         setCountyDetail(detail)
         setShowDetailPanel(true)
+    }, [])
+
+    const clearCountySelection = useCallback(() => {
+        setSelectedCountyFips(null)
+        setCountyDetail(null)
+        setShowDetailPanel(false)
     }, [])
 
     const landcoverTypes = useMemo(
@@ -175,7 +188,9 @@ export function ConditionalProbability() {
             mapLayerSubscriptions.current = []
             if (map.current.getLayer('counties')) map.current.removeLayer('counties')
             if (map.current.getLayer('counties-outline')) map.current.removeLayer('counties-outline')
+            if (map.current.getLayer('selected-neighbor-edges')) map.current.removeLayer('selected-neighbor-edges')
             if (map.current.getSource('counties')) map.current.removeSource('counties')
+            if (map.current.getSource('selected-neighbor-edges')) map.current.removeSource('selected-neighbor-edges')
             if (!data.features || data.features.length === 0) return
 
             map.current.addSource('counties', { type: 'geojson', data: data })
@@ -191,6 +206,8 @@ export function ConditionalProbability() {
                 const colorScale = d3.scaleSequential(d3.interpolateViridis).domain([minVal, maxVal])
                 map.current.addLayer({ id: 'counties', type: 'fill', source: 'counties', paint: { 'fill-color': ['interpolate', ['linear'], ['get', 'mean_value'], minVal, colorScale(minVal), maxVal, colorScale(maxVal)], 'fill-opacity': 0.7 } })
             }
+            map.current.addSource('selected-neighbor-edges', { type: 'geojson', data: EMPTY_NEIGHBOR_EDGES })
+            map.current.addLayer({ id: 'selected-neighbor-edges', type: 'line', source: 'selected-neighbor-edges', paint: { 'line-color': '#64748b', 'line-width': 2, 'line-opacity': 0.55 } })
             map.current.addLayer({ id: 'counties-outline', type: 'line', source: 'counties', paint: { 'line-color': '#888', 'line-width': 1 } })
 
             const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false })
@@ -210,6 +227,13 @@ export function ConditionalProbability() {
     useEffect(() => {
         if (isMapReady && mapData && map.current && mapData.features.length > 0) updateMapLayer(mapData)
     }, [isMapReady, mapData, updateMapLayer])
+
+    useEffect(() => {
+        if (!map.current || !map.current.getLayer('counties')) return
+        map.current.setPaintProperty('counties', 'fill-opacity', selectedCountyFips ? ['case', ['==', ['get', 'fips'], selectedCountyFips], 0.7, 0.35] : 0.7)
+        const edgeSource = map.current.getSource('selected-neighbor-edges') as maplibregl.GeoJSONSource | undefined
+        edgeSource?.setData(sourceData ? selectNeighborEdges(sourceData.neighborEdges, selectedCountyFips) : EMPTY_NEIGHBOR_EDGES)
+    }, [mapData, selectedCountyFips, sourceData])
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape' && isFullscreen) setIsFullscreen(false) }
@@ -246,11 +270,14 @@ export function ConditionalProbability() {
                     )}
                     <div className="flex flex-col gap-1">
                         <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Display</span>
-                        <select value={selectedMetric} onChange={(e) => setSelectedMetric(e.target.value)} className="px-3 py-1.5 text-xs border border-border rounded bg-background cursor-pointer focus:outline-none focus:border-sage-400">
-                            <option value="kl_div">KL Divergence</option>
-                            <option value="l1_distance">L1 Distance</option>
-                        </select>
-                        <select value={selectedLandcover} onChange={(e) => { setSelectedLandcover(e.target.value); setCountyDetail(null); setShowDetailPanel(false) }} className="px-3 py-1.5 text-xs border border-border rounded bg-background cursor-pointer focus:outline-none focus:border-sage-400">
+                        <div role="group" aria-label="Display metric" className="grid grid-cols-2 gap-1">
+                            {([['kl_div', 'KL'], ['l1_distance', 'L1']] as const).map(([metric, label]) => (
+                                <button key={metric} type="button" aria-pressed={selectedMetric === metric} onClick={() => { if (selectedMetric !== metric) { setSelectedMetric(metric); clearCountySelection() } }} className={cn('px-2 py-1.5 text-xs border rounded transition-colors', selectedMetric === metric ? 'border-[var(--button-accent)] bg-[var(--button-accent)] text-background font-semibold' : 'border-border bg-background text-muted-foreground hover:text-foreground')}>
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+                        <select value={selectedLandcover} onChange={(e) => { setSelectedLandcover(e.target.value); clearCountySelection() }} className="px-3 py-1.5 text-xs border border-border rounded bg-background cursor-pointer focus:outline-none focus:border-sage-400">
                             <option value="">All Landcover Types</option>
                             {landcoverTypes.map(lc => <option key={lc} value={lc}>{lc}</option>)}
                         </select>
@@ -281,13 +308,14 @@ export function ConditionalProbability() {
                             <button className="px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors" onClick={(e) => { e.stopPropagation(); setShowDetailPanel(!showDetailPanel) }}>
                                 {showDetailPanel ? 'Collapse' : 'Expand'}
                             </button>
-                            <button className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded text-xl leading-none" onClick={(e) => { e.stopPropagation(); setCountyDetail(null); setShowDetailPanel(false) }}>×</button>
+                            <button className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded text-xl leading-none" onClick={(e) => { e.stopPropagation(); clearCountySelection() }}>×</button>
                         </div>
                     </div>
                     {showDetailPanel && (
                         <div className="h-[calc(100%-55px)] sm:h-[calc(100%-65px)] overflow-y-auto p-3 sm:p-6">
                             {countyDetail.by_landcover.map(lc => {
-                                const sortedDistributions = [...lc.distributions].sort((a, b) => Math.abs(b.contrib) - Math.abs(a.contrib))
+                                const distributionValue = (distribution: ColorDistribution) => selectedMetric === 'kl_div' ? distribution.contrib : distribution.abs_diff
+                                const sortedDistributions = [...lc.distributions].sort((a, b) => Math.abs(distributionValue(b)) - Math.abs(distributionValue(a)))
                                 return (
                                     <div key={lc.lc_type} className="mb-6 sm:mb-8 p-3 sm:p-4 bg-background border border-border rounded">
                                         <h3 className="mt-0 mb-2 text-base sm:text-xl text-foreground">{lc.lc_type}</h3>
@@ -299,11 +327,12 @@ export function ConditionalProbability() {
                                             <p className="sm:inline">L1: {lc.l1_distance.toFixed(4)}</p>
                                         </div>
                                         <div className="mb-6">
-                                            <h4 className="mb-3 text-base font-semibold text-foreground">Color Distribution (KL Contribution)</h4>
+                                            <h4 className="mb-3 text-base font-semibold text-foreground">Color Distribution ({selectedMetric === 'kl_div' ? 'KL Contribution' : 'L1 Difference'})</h4>
                                             <div className="space-y-1.5 border border-border rounded-lg p-3 bg-muted/30">
                                                 {sortedDistributions.map((dist) => {
-                                                    const maxContrib = Math.max(...sortedDistributions.map(d => Math.abs(d.contrib)))
-                                                    const barWidth = maxContrib > 0 ? (Math.abs(dist.contrib) / maxContrib) * 100 : 0
+                                                    const maxContrib = Math.max(...sortedDistributions.map(d => Math.abs(distributionValue(d))))
+                                                    const value = distributionValue(dist)
+                                                    const barWidth = maxContrib > 0 ? (Math.abs(value) / maxContrib) * 100 : 0
                                                     return (
                                                         <div key={dist.clr} className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm">
                                                             <span className="w-16 sm:w-24 flex items-center gap-1 sm:gap-2 truncate">
@@ -315,9 +344,9 @@ export function ConditionalProbability() {
                                                                 <span className="truncate">{dist.clr}</span>
                                                             </span>
                                                             <div className="flex-1 h-2.5 sm:h-3 bg-muted rounded overflow-hidden">
-                                                                <div className="h-full rounded" style={{ width: `${barWidth}%`, backgroundColor: dist.contrib >= 0 ? '#6b7280' : '#dc2626' }} />
+                                                                <div className="h-full rounded" style={{ width: `${barWidth}%`, backgroundColor: selectedMetric === 'kl_div' && value < 0 ? '#dc2626' : '#6b7280' }} />
                                                             </div>
-                                                            <span className="w-14 sm:w-20 text-right font-medium text-foreground">{dist.contrib.toFixed(4)}</span>
+                                                            <span className="w-14 sm:w-20 text-right font-medium text-foreground">{value.toFixed(4)}</span>
                                                         </div>
                                                     )
                                                 })}
@@ -328,8 +357,8 @@ export function ConditionalProbability() {
                                             <DeviationChart distributions={lc.distributions} />
                                         </div>
                                         <div className="mb-6">
-                                            <h4 className="mb-3 text-base font-semibold text-foreground">Top Contributing Colors</h4>
-                                            <TopContributorsChart distributions={lc.distributions} />
+                                            <h4 className="mb-3 text-base font-semibold text-foreground">{selectedMetric === 'kl_div' ? 'Top Contributing Colors' : 'Largest L1 Differences'}</h4>
+                                            <TopContributorsChart distributions={lc.distributions} metric={selectedMetric} />
                                         </div>
                                         <div className="mt-4">
                                             <h4 className="mb-2 text-base font-semibold text-foreground">County vs Pooled Distribution</h4>
@@ -418,8 +447,9 @@ function DeviationChart({ distributions }: { distributions: ColorDistribution[] 
     )
 }
 
-function TopContributorsChart({ distributions }: { distributions: ColorDistribution[] }) {
-    const top = [...distributions].sort((a, b) => Math.abs(b.contrib) - Math.abs(a.contrib)).slice(0, 10)
+function TopContributorsChart({ distributions, metric }: { distributions: ColorDistribution[]; metric: Metric }) {
+    const value = (distribution: ColorDistribution) => metric === 'kl_div' ? distribution.contrib : distribution.abs_diff
+    const top = [...distributions].sort((a, b) => Math.abs(value(b)) - Math.abs(value(a))).slice(0, 10)
     const maxProb = Math.max(...top.map(d => Math.max(d.p_county, d.p_pool)))
     return (
         <div className="border border-border rounded-lg p-3 sm:p-4 bg-muted/30">
@@ -430,7 +460,7 @@ function TopContributorsChart({ distributions }: { distributions: ColorDistribut
                             <div className="flex items-center gap-1.5 sm:gap-2">
                                 {dist.clr === 'foo' || dist.clr === 'bar' ? <span className="w-3 h-3 sm:w-4 sm:h-4 rounded-full bg-muted shrink-0" /> : <span className="w-3 h-3 sm:w-4 sm:h-4 rounded-full border border-border shrink-0" style={{ backgroundColor: PROPERTY_COLORS[dist.clr] || '#ccc' }} />}
                                 <span className="font-medium">{dist.clr}</span>
-                                <span className="text-[10px] sm:text-xs text-muted-foreground">(KL: {dist.contrib.toFixed(4)})</span>
+                                <span className="text-[10px] sm:text-xs text-muted-foreground">({metric === 'kl_div' ? 'KL' : 'L1'}: {value(dist).toFixed(4)})</span>
                             </div>
                         </div>
                         <div className="space-y-1.5">
