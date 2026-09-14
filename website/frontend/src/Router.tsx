@@ -7,9 +7,10 @@ import { C2STMap } from './C2STMap'
 import { MoransIMap } from './MoransIMap'
 import GroupDivergence from './GroupDivergence'
 import { ColorMap } from './ColorMap'
-import { AppSidebar, type Page } from './components/app-sidebar'
+import { AppSidebar } from './components/app-sidebar'
 import { SiteHeader } from './components/site-header'
 import { SidebarInset, SidebarProvider } from './components/ui/sidebar'
+import { pageFromPathname, pagePath, type Page } from './lib/dashboardNavigation'
 
 const pageTitles: Record<Page, string> = {
     'home': 'Home',
@@ -29,7 +30,15 @@ function getPdfHashPage(): Page | null {
 }
 
 export function Router() {
-    const [page, setPage] = useState<Page>(() => getPdfHashPage() ?? 'home')
+    const [page, setPage] = useState<Page>(() => getPdfHashPage() ?? pageFromPathname(window.location.pathname))
+
+    const handlePageChange = (nextPage: Page) => {
+        const nextPath = pagePath(nextPage)
+        if (window.location.pathname !== nextPath) {
+            window.history.pushState(null, '', nextPath)
+        }
+        setPage(nextPage)
+    }
 
     useEffect(() => {
         const handleHashChange = () => {
@@ -37,6 +46,12 @@ export function Router() {
         }
         window.addEventListener('hashchange', handleHashChange)
         return () => window.removeEventListener('hashchange', handleHashChange)
+    }, [])
+
+    useEffect(() => {
+        const handlePopState = () => setPage(getPdfHashPage() ?? pageFromPathname(window.location.pathname))
+        window.addEventListener('popstate', handlePopState)
+        return () => window.removeEventListener('popstate', handlePopState)
     }, [])
 
     useEffect(() => {
@@ -52,13 +67,13 @@ export function Router() {
                 } as React.CSSProperties
             }
         >
-            <AppSidebar variant="inset" currentPage={page} onPageChange={setPage} />
+            <AppSidebar variant="inset" currentPage={page} onPageChange={handlePageChange} />
             <SidebarInset>
                 <SiteHeader title={pageTitles[page]} />
                 <div className="flex flex-1 flex-col overflow-hidden">
                     <div className="@container/main flex flex-1 flex-col min-h-0">
                         <div className={page === 'home' ? 'overflow-y-auto px-4 lg:px-8' : 'hidden'}>
-                            <HomePage onPageChange={setPage} />
+                            <HomePage onPageChange={handlePageChange} />
                         </div>
                         <div className={page === 'conditional-probability' ? 'flex flex-1 flex-col min-h-0' : 'hidden'}>
                             <ConditionalProbability />

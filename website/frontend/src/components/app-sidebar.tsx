@@ -13,6 +13,7 @@ import {
 } from "@tabler/icons-react"
 
 import { NavMain } from "@/components/nav-main"
+import { pagePath, type Page } from "@/lib/dashboardNavigation"
 import {
     Sidebar,
     SidebarContent,
@@ -22,53 +23,35 @@ import {
     SidebarMenuItem,
 } from "@/components/ui/sidebar"
 
-export type Page = 'home' | 'conditional-probability' | 'empirical-bayes' | 'neighbor-divergence' | 'c2st' | 'morans-i' | 'group-divergence' | 'color-map'
-
 const navItems = [
     {
-        title: "Home",
-        id: "home" as Page,
-        icon: IconHome,
+        label: "Story",
+        items: [
+            { title: "Overview", id: "home" as Page, href: pagePath('home'), icon: IconHome },
+            { title: "Guided Case Study", href: "/viz", icon: IconBook },
+        ],
     },
     {
-        title: "Case Study",
-        href: "/viz",
-        icon: IconBook,
+        label: "Explore & Stabilize",
+        items: [
+            { title: "Color Distribution", id: "color-map" as Page, href: pagePath('color-map'), icon: IconPalette },
+            { title: "Empirical Bayes Shrinkage", id: "empirical-bayes" as Page, href: pagePath('empirical-bayes'), icon: IconChartBar },
+            { title: "Conditional Pooling", id: "conditional-probability" as Page, href: pagePath('conditional-probability'), icon: IconMathFunction },
+        ],
     },
     {
-        title: "Empirical Bayes Pooling",
-        id: "empirical-bayes" as Page,
-        icon: IconChartBar,
+        label: "Detect Divergence",
+        items: [
+            { title: "Neighbor Pairs (JSD)", id: "neighbor-divergence" as Page, href: pagePath('neighbor-divergence'), icon: IconGraph },
+            { title: "Statewide Baseline (JSD)", id: "group-divergence" as Page, href: pagePath('group-divergence'), icon: IconGitCompare },
+        ],
     },
     {
-        title: "Conditional Pooling",
-        id: "conditional-probability" as Page,
-        icon: IconMathFunction,
-    },
-    {
-        title: "Neighbor Divergence",
-        id: "neighbor-divergence" as Page,
-        icon: IconGraph,
-    },
-    {
-        title: "Group-Level Divergence",
-        id: "group-divergence" as Page,
-        icon: IconGitCompare,
-    },
-    {
-        title: "C2ST",
-        id: "c2st" as Page,
-        icon: IconBrain,
-    },
-    {
-        title: "Moran's I",
-        id: "morans-i" as Page,
-        icon: IconMap,
-    },
-    {
-        title: "Color Distribution Map",
-        id: "color-map" as Page,
-        icon: IconPalette,
+        label: "Validate",
+        items: [
+            { title: "Classifier Test (C2ST)", id: "c2st" as Page, href: pagePath('c2st'), icon: IconBrain },
+            { title: "Spatial Clustering (Moran's I)", id: "morans-i" as Page, href: pagePath('morans-i'), icon: IconMap },
+        ],
     },
 ]
 
